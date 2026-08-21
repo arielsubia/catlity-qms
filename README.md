@@ -1,46 +1,46 @@
 # Catlity QMS
 
-Plataforma SaaS multi-tenant para gestión de calidad y auditorías, asistida por agentes de IA especializados que conocen las normativas específicas de cada industria.
+Multi-tenant SaaS platform for quality management and auditing, powered by specialized AI agents that understand industry-specific regulatory standards.
 
-El MVP está orientado a la industria automotriz (IATF 16949) con capacidad de extensión a otras industrias (farmacéutica, alimentaria, etc.).
+The MVP targets the automotive industry (IATF 16949) with built-in extensibility for additional industries (pharmaceutical, food, etc.).
 
 A Phil Dev project.
 
-## Arquitectura
+## Architecture
 
-![Arquitectura General](docs/diagrams/exports/architecture-general.png)
+![General Architecture](docs/diagrams/exports/architecture-general.png)
 
-La plataforma se compone de:
+The platform is composed of:
 
-- **Frontend**: SPA React con Ant Design, autenticación vía AWS Amplify/Cognito
-- **Backend**: API REST con FastAPI desplegada en ECS/Fargate
-- **Base de datos**: Amazon RDS PostgreSQL con multi-tenancy por `tenant_id`
-- **Almacenamiento**: S3 para evidencia documental, DynamoDB para metadatos
-- **Agentes IA**: 3 agentes especializados en Amazon Bedrock con Knowledge Bases
-  - Agente Normativo (consultas ISO/IATF/GMP)
-  - Agente de Informes (generación de borradores de auditoría)
-  - Agente de Onboarding (configuración de nuevos tenants)
-- **Dashboard**: Amazon QuickSight embebido con row-level security
-- **IaC**: Terraform con tagging obligatorio (`Project: catlity-qms`)
+- **Frontend**: React SPA with Ant Design, authentication via AWS Amplify/Cognito
+- **Backend**: REST API built with FastAPI, deployed on ECS/Fargate
+- **Database**: Amazon RDS PostgreSQL with multi-tenancy via `tenant_id`
+- **Storage**: S3 for documentary evidence, DynamoDB for metadata
+- **AI Agents**: 3 specialized agents on Amazon Bedrock with Knowledge Bases
+  - Normative Agent (ISO/IATF/GMP regulatory queries)
+  - Report Agent (audit report draft generation)
+  - Onboarding Agent (new tenant configuration)
+- **Dashboard**: Amazon QuickSight embedded with row-level security
+- **IaC**: Terraform with mandatory tagging (`Project: catlity-qms`)
 
-## Stack Tecnológico
+## Tech Stack
 
-| Capa | Tecnología |
-|------|------------|
+| Layer | Technology |
+|-------|------------|
 | Frontend | React + TypeScript + AWS Amplify + Ant Design |
-| Backend API | FastAPI (Python) en ECS/Fargate |
-| Base de datos | Amazon RDS PostgreSQL |
-| Documentos/evidencia | Amazon S3 |
-| Metadatos | Amazon DynamoDB |
-| Autenticación | Amazon Cognito |
-| Agentes IA | Amazon Bedrock + Knowledge Bases |
+| Backend API | FastAPI (Python) on ECS/Fargate |
+| Database | Amazon RDS PostgreSQL |
+| Documents/Evidence | Amazon S3 |
+| Metadata | Amazon DynamoDB |
+| Authentication | Amazon Cognito |
+| AI Agents | Amazon Bedrock + Knowledge Bases |
 | Dashboard | Amazon QuickSight |
 | IaC | Terraform |
 | CI/CD | GitHub Actions |
-| Diagramas | draw.io (.drawio) |
-| Monitoreo costos | AWS Cost Explorer + AWS Budgets |
+| Diagrams | draw.io (.drawio) |
+| Cost Monitoring | AWS Cost Explorer + AWS Budgets |
 
-## Estructura del Repositorio
+## Repository Structure
 
 ```
 catlity-qms/
@@ -48,9 +48,9 @@ catlity-qms/
 ├── backend/                  # FastAPI (Python)
 ├── infra/                    # Terraform modules
 ├── docs/
-│   ├── PLAN.md              # Plan de implementación completo
-│   └── diagrams/            # Archivos .drawio
-│       └── exports/         # PNGs exportados
+│   ├── PLAN.md              # Full implementation plan
+│   └── diagrams/            # .drawio source files
+│       └── exports/         # Exported PNGs
 ├── knowledge-base/
 │   ├── common/              # ISO 9001
 │   ├── automotive/          # IATF 16949
@@ -62,13 +62,13 @@ catlity-qms/
 
 ## Local Development Setup
 
-### Prerrequisitos
+### Prerequisites
 
 - Python 3.12+
 - Node.js 20+
-- Docker y Docker Compose
+- Docker and Docker Compose
 - Terraform 1.6+
-- AWS CLI configurado con perfil válido
+- AWS CLI configured with a valid profile
 
 ### Backend
 
@@ -77,7 +77,7 @@ cd backend
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-docker-compose up -d  # PostgreSQL local
+docker-compose up -d  # Local PostgreSQL
 alembic upgrade head
 uvicorn app.main:app --reload
 ```
@@ -90,7 +90,7 @@ npm install
 npm run dev
 ```
 
-### Infraestructura
+### Infrastructure
 
 ```bash
 cd infra/environments/dev
@@ -99,14 +99,14 @@ terraform plan
 terraform apply
 ```
 
-## Diagramas
+## Diagrams
 
-Los diagramas de arquitectura están en `docs/diagrams/` en formato `.drawio` (editables con [draw.io](https://app.diagrams.net/)). Cada módulo tiene su propio diagrama documentando la arquitectura, modelo de datos o flujos de usuario.
+Architecture diagrams live in `docs/diagrams/` as `.drawio` files (editable with [draw.io](https://app.diagrams.net/)). Each module has its own diagram documenting the architecture, data model, or user flows.
 
-## Monitoreo de Costos
+## Cost Monitoring
 
-Todos los recursos AWS están etiquetados con `Project: catlity-qms` para filtrar en Cost Explorer. Se configuran alertas de AWS Budgets al 50%, 80% y 100% del presupuesto mensual.
+All AWS resources are tagged with `Project: catlity-qms` for filtering in Cost Explorer. AWS Budgets alerts are configured at 50%, 80%, and 100% of the monthly budget.
 
-## Licencia
+## License
 
-Propietario — Phil Dev.
+Proprietary — Phil Dev.
