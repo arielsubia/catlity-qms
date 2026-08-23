@@ -8,7 +8,7 @@ A Phil Dev project.
 
 ## Architecture
 
-![General Architecture](docs/diagrams/exports/architecture-general.png)
+![General Architecture](docs/diagrams/architecture-general.png)
 
 The platform is composed of:
 
@@ -37,7 +37,6 @@ The platform is composed of:
 | Dashboard | Amazon QuickSight |
 | IaC | Terraform |
 | CI/CD | GitHub Actions |
-| Diagrams | draw.io (.drawio) |
 | Cost Monitoring | AWS Cost Explorer + AWS Budgets |
 
 ## Repository Structure
@@ -49,8 +48,7 @@ catlity-qms/
 ├── infra/                    # Terraform modules
 ├── docs/
 │   ├── PLAN.md              # Full implementation plan
-│   └── diagrams/            # .drawio source files
-│       └── exports/         # Exported PNGs
+│   └── diagrams/            # Architecture diagrams (PNG)
 ├── knowledge-base/
 │   ├── common/              # ISO 9001
 │   ├── automotive/          # IATF 16949
@@ -99,14 +97,10 @@ terraform plan
 terraform apply
 ```
 
-## Diagrams
-
-Architecture diagrams live in `docs/diagrams/` as `.drawio` files (editable with [draw.io](https://app.diagrams.net/)). Each module has its own diagram documenting the architecture, data model, or user flows.
-
 ## Cost Monitoring
 
 All AWS resources are tagged with `Project: catlity-qms` for filtering in Cost Explorer. AWS Budgets alerts are configured at 50%, 80%, and 100% of the monthly budget.
 
 ## License
 
-Proprietary — Phil Dev.
+Proprietary — Phil Dev <sub><img src="docs/assets/logo-phildev.png" width="20"></sub>
