@@ -4,6 +4,7 @@
 # Environment variables
 .env
 .env.*
+!.env.example
 
 # Python
 .venv/

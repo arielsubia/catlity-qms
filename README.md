@@ -45,6 +45,19 @@ The platform is composed of:
 catlity-qms/
 ├── frontend/                 # React + TypeScript + Ant Design
 ├── backend/                  # FastAPI (Python)
+│   ├── app/
+│   │   ├── main.py          # FastAPI application entry point
+│   │   ├── core/            # Config, database, security
+│   │   ├── models/          # SQLAlchemy ORM models
+│   │   ├── schemas/         # Pydantic request/response schemas
+│   │   ├── api/v1/          # API route handlers
+│   │   └── services/        # Business logic layer
+│   ├── alembic/             # Database migrations
+│   ├── tests/               # pytest test suite
+│   ├── Dockerfile
+│   ├── docker-compose.yml   # Local dev (PostgreSQL + API)
+│   ├── requirements.txt
+│   └── requirements-dev.txt
 ├── infra/                    # Terraform modules
 ├── docs/
 │   ├── PLAN.md              # Full implementation plan
@@ -74,11 +87,46 @@ catlity-qms/
 cd backend
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-docker-compose up -d  # Local PostgreSQL
+pip install -r requirements-dev.txt
+
+# Start local PostgreSQL
+docker-compose up -d db
+
+# Run migrations
 alembic upgrade head
+
+# Start API server (http://localhost:8000)
 uvicorn app.main:app --reload
+
+# Run tests
+pytest tests/ -v
+
+# Lint
+ruff check .
 ```
+
+Alternatively, run everything with Docker Compose:
+
+```bash
+cd backend
+docker-compose up
+```
+
+The API will be available at `http://localhost:8000` with interactive docs at `/docs`.
+
+#### Data Model
+
+The backend uses a multi-tenant architecture with `tenant_id` on all tables:
+
+- **Tenant** — Organization using the platform
+- **User** — Team member linked to a tenant (roles: admin, auditor, auditee, qa_manager)
+- **Audit** — Audit session with state machine (planned → in_progress → completed → closed)
+- **Finding** — Non-conformity or observation (types: major_nc, minor_nc, observation, improvement_opportunity)
+- **CorrectiveAction** — Action plan for a finding
+- **Checklist / ChecklistItem** — Audit template questions
+- **Evidence** — Documents/photos uploaded to S3
+
+See `docs/diagrams/exports/data-model-er.png` for the full ER diagram.
 
 ### Frontend
 
