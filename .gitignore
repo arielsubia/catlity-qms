@@ -1,6 +1,10 @@
 # Kiro
 .kiro/
 
+# Scrum planning (internal — not for public repo)
+docs/SCRUM.md
+docs/sprints/
+
 # Environment variables
 .env
 .env.*
