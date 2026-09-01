@@ -128,6 +128,39 @@ The backend uses a multi-tenant architecture with `tenant_id` on all tables:
 
 See `docs/diagrams/exports/data-model-er.png` for the full ER diagram.
 
+#### Authentication & Authorization
+
+Authentication is handled by an Amazon Cognito User Pool. The frontend signs in
+through Amplify and sends the resulting JWT as a `Bearer` token on every API
+request. The backend validates each token against the pool's JWKS (signature,
+issuer, and audience) and derives the caller's identity from Cognito claims.
+
+- **Tenant isolation**: the `custom:tenant_id` claim is required on every token
+  and scopes all data access.
+- **Roles**: `admin`, `qa_manager`, `auditor`, `auditee` — carried in the
+  `custom:role` attribute and mirrored as Cognito groups.
+- **Role enforcement**: routes declare `Depends(require_role([...]))`; access is
+  granted when the user's role or group matches.
+
+Relevant endpoints:
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/v1/auth/register` | Provision a user in Cognito and persist the local profile |
+| `GET`  | `/api/v1/auth/me` | Return the authenticated principal (tenant, role, groups) |
+
+Required environment variables (see `backend/.env.example`):
+
+```
+AWS_REGION=us-east-1
+COGNITO_USER_POOL_ID=<pool id from terraform output>
+COGNITO_APP_CLIENT_ID=<app client id from terraform output>
+```
+
+The Cognito User Pool, groups, and app client are provisioned by the
+`infra/modules/cognito` Terraform module. See `docs/diagrams/auth-flow.drawio`
+for the end-to-end sign-in and token validation flow.
+
 ### Frontend
 
 ```bash

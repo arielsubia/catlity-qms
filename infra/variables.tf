@@ -37,3 +37,15 @@ variable "budget_alert_email" {
   description = "Email address for budget alert notifications"
   type        = string
 }
+
+variable "cognito_callback_urls" {
+  description = "Allowed OAuth callback URLs for the Cognito app client"
+  type        = list(string)
+  default     = ["http://localhost:5173/"]
+}
+
+variable "cognito_logout_urls" {
+  description = "Allowed OAuth logout URLs for the Cognito app client"
+  type        = list(string)
+  default     = ["http://localhost:5173/"]
+}

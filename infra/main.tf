@@ -20,6 +20,16 @@ module "database" {
   tags                  = local.common_tags
 }
 
+module "cognito" {
+  source = "./modules/cognito"
+
+  project_name  = var.project_name
+  environment   = var.environment
+  callback_urls = var.cognito_callback_urls
+  logout_urls   = var.cognito_logout_urls
+  tags          = local.common_tags
+}
+
 module "cost" {
   source = "./modules/cost"
 
