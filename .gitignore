@@ -1,8 +1,12 @@
-# Kiro
+# Kiro (legacy steering — unused archive)
 .kiro/
+
+# Cursor (local project rules — not for public repo)
+.cursor/
 
 # Scrum planning (internal — not for public repo)
 docs/SCRUM.md
+docs/PLAN.md
 docs/sprints/
 
 # Environment variables
@@ -45,5 +49,5 @@ Thumbs.db
 # Logs
 *.log
 
-# Diagrams (source files kept locally, only PNGs committed)
+# Diagrams (drawio local only; PNGs in docs/diagrams/ are committed)
 *.drawio
