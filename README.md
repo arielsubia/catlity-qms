@@ -2,9 +2,8 @@
 
 Multi-tenant SaaS platform for quality management and auditing, powered by specialized AI agents that understand industry-specific regulatory standards.
 
-The MVP targets the automotive industry (IATF 16949) with built-in extensibility for additional industries (pharmaceutical, food, etc.).
+The MVP targets the quality industry (ISO 9001) with built-in extensibility for additional industries (aeronautica, food, etc.).
 
-A Phil Dev project.
 
 ## Architecture
 
@@ -158,7 +157,7 @@ COGNITO_APP_CLIENT_ID=<app client id from terraform output>
 ```
 
 The Cognito User Pool, groups, and app client are provisioned by the
-`infra/modules/cognito` Terraform module. See `docs/diagrams/auth-flow.drawio`
+`infra/modules/cognito` Terraform module. See `docs/diagrams/auth-flow.png`
 for the end-to-end sign-in and token validation flow.
 
 ### Frontend
