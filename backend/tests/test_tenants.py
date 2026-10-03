@@ -134,3 +134,37 @@ def test_delete_tenant(client: TestClient, rsa_keypair: dict[str, Any]) -> None:
     assert response.status_code == 204
     get_resp = client.get(f"/api/v1/tenants/{tenant_id}", headers=_auth(token))
     assert get_resp.status_code == 404
+
+
+def test_tenant_cannot_access_another_tenant(
+    client: TestClient, rsa_keypair: dict[str, Any]
+) -> None:
+    """Tenant A cannot read, update, or delete tenant B."""
+    tenant_a = _create_tenant(client, "Tenant A", industry="automotive")
+    tenant_b = _create_tenant(client, "Tenant B", industry="pharmaceutical")
+    token_a = make_token(rsa_keypair, tenant_id=tenant_a)
+    token_b = make_token(rsa_keypair, tenant_id=tenant_b)
+
+    listed = client.get("/api/v1/tenants/", headers=_auth(token_a))
+    assert listed.status_code == 200
+    listed_ids = [item["id"] for item in listed.json()]
+    assert listed_ids == [tenant_a]
+
+    hidden = client.get(f"/api/v1/tenants/{tenant_b}", headers=_auth(token_a))
+    assert hidden.status_code == 404
+    assert "Tenant B" not in hidden.text
+
+    patched = client.patch(
+        f"/api/v1/tenants/{tenant_b}",
+        json={"name": "Stolen"},
+        headers=_auth(token_a),
+    )
+    assert patched.status_code == 404
+
+    deleted = client.delete(f"/api/v1/tenants/{tenant_b}", headers=_auth(token_a))
+    assert deleted.status_code == 404
+
+    own = client.get(f"/api/v1/tenants/{tenant_b}", headers=_auth(token_b))
+    assert own.status_code == 200
+    assert own.json()["name"] == "Tenant B"
+    assert own.json()["industry"] == "pharmaceutical"
