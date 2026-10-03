@@ -1,4 +1,74 @@
+"""Tests for tenant endpoints scoped to the caller's JWT."""
+
+from __future__ import annotations
+
+import time
+from typing import Any
+
+import pytest
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
 from fastapi.testclient import TestClient
+from jose import jwk
+
+from app.core import security
+from app.core.config import settings
+from tests.test_auth import make_token
+
+
+@pytest.fixture(scope="module")
+def rsa_keypair() -> dict[str, Any]:
+    """RSA keypair used to sign tenant-scoped tokens in this module."""
+    private = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    private_pem = private.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.TraditionalOpenSSL,
+        encryption_algorithm=serialization.NoEncryption(),
+    ).decode()
+
+    public_jwk = jwk.construct(
+        private.public_key()
+        .public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+        .decode(),
+        algorithm="RS256",
+    ).to_dict()
+    public_jwk["kid"] = "test-key-tenants"
+    public_jwk["alg"] = "RS256"
+    public_jwk["use"] = "sig"
+
+    return {"private_pem": private_pem, "public_jwk": public_jwk}
+
+
+@pytest.fixture(autouse=True)
+def configure_cognito(
+    rsa_keypair: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Point settings at a fake pool and preload the JWKS cache."""
+    monkeypatch.setattr(settings, "cognito_user_pool_id", "us-east-1_test", raising=False)
+    monkeypatch.setattr(
+        settings, "cognito_app_client_id", "test-client-id", raising=False
+    )
+    monkeypatch.setattr(settings, "aws_region", "us-east-1", raising=False)
+
+    kid = rsa_keypair["public_jwk"]["kid"]
+    security._jwks_cache._keys = {kid: rsa_keypair["public_jwk"]}
+    security._jwks_cache._fetched_at = time.monotonic()
+
+
+def _auth(token: str) -> dict[str, str]:
+    return {"Authorization": f"Bearer {token}"}
+
+
+def _create_tenant(client: TestClient, name: str, industry: str = "automotive") -> str:
+    response = client.post(
+        "/api/v1/tenants/",
+        json={"name": name, "industry": industry},
+    )
+    assert response.status_code == 201
+    return response.json()["id"]
 
 
 def test_create_tenant(client: TestClient) -> None:
@@ -16,49 +86,85 @@ def test_create_tenant(client: TestClient) -> None:
     assert "id" in data
 
 
-def test_list_tenants(client: TestClient) -> None:
-    client.post("/api/v1/tenants/", json={"name": "Tenant A", "industry": "automotive"})
-    client.post("/api/v1/tenants/", json={"name": "Tenant B", "industry": "pharmaceutical"})
-    response = client.get("/api/v1/tenants/")
+def test_list_tenants(client: TestClient, rsa_keypair: dict[str, Any]) -> None:
+    tenant_id = _create_tenant(client, "Tenant A")
+    token = make_token(rsa_keypair, tenant_id=tenant_id)
+    response = client.get("/api/v1/tenants/", headers=_auth(token))
     assert response.status_code == 200
     data = response.json()
-    assert len(data) == 2
+    assert len(data) == 1
+    assert data[0]["id"] == tenant_id
+    assert data[0]["name"] == "Tenant A"
 
 
-def test_get_tenant(client: TestClient) -> None:
-    create_resp = client.post(
-        "/api/v1/tenants/", json={"name": "GetMe", "industry": "automotive"}
-    )
-    tenant_id = create_resp.json()["id"]
-    response = client.get(f"/api/v1/tenants/{tenant_id}")
+def test_get_tenant(client: TestClient, rsa_keypair: dict[str, Any]) -> None:
+    tenant_id = _create_tenant(client, "GetMe")
+    token = make_token(rsa_keypair, tenant_id=tenant_id)
+    response = client.get(f"/api/v1/tenants/{tenant_id}", headers=_auth(token))
     assert response.status_code == 200
     assert response.json()["name"] == "GetMe"
 
 
-def test_get_tenant_not_found(client: TestClient) -> None:
-    response = client.get("/api/v1/tenants/nonexistent-id")
+def test_get_tenant_not_found(client: TestClient, rsa_keypair: dict[str, Any]) -> None:
+    token = make_token(rsa_keypair, tenant_id="nonexistent-id")
+    response = client.get(
+        "/api/v1/tenants/nonexistent-id",
+        headers=_auth(token),
+    )
     assert response.status_code == 404
 
 
-def test_update_tenant(client: TestClient) -> None:
-    create_resp = client.post(
-        "/api/v1/tenants/", json={"name": "Original", "industry": "automotive"}
-    )
-    tenant_id = create_resp.json()["id"]
+def test_update_tenant(client: TestClient, rsa_keypair: dict[str, Any]) -> None:
+    tenant_id = _create_tenant(client, "Original")
+    token = make_token(rsa_keypair, tenant_id=tenant_id)
     response = client.patch(
-        f"/api/v1/tenants/{tenant_id}", json={"name": "Updated"}
+        f"/api/v1/tenants/{tenant_id}",
+        json={"name": "Updated"},
+        headers=_auth(token),
     )
     assert response.status_code == 200
     assert response.json()["name"] == "Updated"
     assert response.json()["industry"] == "automotive"
 
 
-def test_delete_tenant(client: TestClient) -> None:
-    create_resp = client.post(
-        "/api/v1/tenants/", json={"name": "DeleteMe", "industry": "pharmaceutical"}
-    )
-    tenant_id = create_resp.json()["id"]
-    response = client.delete(f"/api/v1/tenants/{tenant_id}")
+def test_delete_tenant(client: TestClient, rsa_keypair: dict[str, Any]) -> None:
+    tenant_id = _create_tenant(client, "DeleteMe", industry="pharmaceutical")
+    token = make_token(rsa_keypair, tenant_id=tenant_id)
+    response = client.delete(f"/api/v1/tenants/{tenant_id}", headers=_auth(token))
     assert response.status_code == 204
-    get_resp = client.get(f"/api/v1/tenants/{tenant_id}")
+    get_resp = client.get(f"/api/v1/tenants/{tenant_id}", headers=_auth(token))
     assert get_resp.status_code == 404
+
+
+def test_tenant_cannot_access_another_tenant(
+    client: TestClient, rsa_keypair: dict[str, Any]
+) -> None:
+    """Tenant A cannot read, update, or delete tenant B."""
+    tenant_a = _create_tenant(client, "Tenant A", industry="automotive")
+    tenant_b = _create_tenant(client, "Tenant B", industry="pharmaceutical")
+    token_a = make_token(rsa_keypair, tenant_id=tenant_a)
+    token_b = make_token(rsa_keypair, tenant_id=tenant_b)
+
+    listed = client.get("/api/v1/tenants/", headers=_auth(token_a))
+    assert listed.status_code == 200
+    listed_ids = [item["id"] for item in listed.json()]
+    assert listed_ids == [tenant_a]
+
+    hidden = client.get(f"/api/v1/tenants/{tenant_b}", headers=_auth(token_a))
+    assert hidden.status_code == 404
+    assert "Tenant B" not in hidden.text
+
+    patched = client.patch(
+        f"/api/v1/tenants/{tenant_b}",
+        json={"name": "Stolen"},
+        headers=_auth(token_a),
+    )
+    assert patched.status_code == 404
+
+    deleted = client.delete(f"/api/v1/tenants/{tenant_b}", headers=_auth(token_a))
+    assert deleted.status_code == 404
+
+    own = client.get(f"/api/v1/tenants/{tenant_b}", headers=_auth(token_b))
+    assert own.status_code == 200
+    assert own.json()["name"] == "Tenant B"
+    assert own.json()["industry"] == "pharmaceutical"
