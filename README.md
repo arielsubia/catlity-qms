@@ -75,7 +75,7 @@ catlity-qms/
 ### Prerequisites
 
 - Python 3.12+
-- Node.js 20+
+- Node.js 22.13+
 - Docker and Docker Compose
 - Terraform 1.6+
 - AWS CLI configured with a valid profile
@@ -165,8 +165,20 @@ for the end-to-end sign-in and token validation flow.
 ```bash
 cd frontend
 npm install
+
+# Start dev server (http://localhost:5173)
 npm run dev
+
+# Lint and formatting
+npm run lint
+npm run format:check   # npm run format to fix
+
+# Production build (type-check + bundle into dist/)
+npm run build
 ```
+
+The frontend uses React 19 + TypeScript + Vite with Ant Design as the UI library.
+Dependency versions are pinned exactly (`frontend/.npmrc` sets `save-exact=true`).
 
 ### Infrastructure
 
