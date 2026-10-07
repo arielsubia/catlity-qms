@@ -165,9 +165,13 @@ for the end-to-end sign-in and token validation flow.
 ```bash
 cd frontend
 npm install
+cp .env.example .env.local   # then fill in the Cognito values
 
 # Start dev server (http://localhost:5173)
 npm run dev
+
+# Unit tests (Vitest + React Testing Library)
+npm test
 
 # Lint and formatting
 npm run lint
@@ -179,6 +183,20 @@ npm run build
 
 The frontend uses React 19 + TypeScript + Vite with Ant Design as the UI library.
 Dependency versions are pinned exactly (`frontend/.npmrc` sets `save-exact=true`).
+
+Environment variables (`frontend/.env.local`, not committed):
+
+| Variable | Source |
+|----------|--------|
+| `VITE_COGNITO_USER_POOL_ID` | `terraform output -raw cognito_user_pool_id` |
+| `VITE_COGNITO_APP_CLIENT_ID` | `terraform output -raw cognito_app_client_id` |
+| `VITE_API_BASE_URL` | Backend URL, `http://localhost:8000` by default |
+
+Sign-in uses AWS Amplify against the Cognito User Pool. Tokens are kept in
+memory rather than `localStorage` to limit XSS exposure, so a full page reload
+ends the session. Registration goes through `POST /api/v1/auth/register` so the
+tenant and role are assigned server-side. Without the Cognito variables the app
+still runs and shows a configuration warning on the sign-in screen.
 
 ### Infrastructure
 

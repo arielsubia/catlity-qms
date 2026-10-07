@@ -4,4 +4,20 @@ body {
 
 .app-shell {
   min-height: 100svh;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 400px;
+}
+
+.auth-alert {
+  margin-bottom: 16px;
+}
+
+.auth-switch {
+  margin: 16px 0 0;
+  text-align: center;
 }
