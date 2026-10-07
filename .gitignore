@@ -35,6 +35,8 @@ node_modules/
 *.tfstate
 *.tfstate.backup
 *.tfplan
+*.tfvars
+!*.tfvars.example
 
 # IDE
 .vscode/

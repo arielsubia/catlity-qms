@@ -1,5 +1,5 @@
 terraform {
-  required_version = ">= 1.5.0"
+  required_version = ">= 1.11.0"
 
   required_providers {
     aws = {
@@ -9,11 +9,11 @@ terraform {
   }
 
   backend "s3" {
-    bucket         = "catlity-qms-terraform-state"
-    key            = "infra/terraform.tfstate"
-    region         = "us-east-1"
-    dynamodb_table = "catlity-qms-terraform-locks"
-    encrypt        = true
+    bucket       = "catlity-qms-terraform-state"
+    key          = "infra/terraform.tfstate"
+    region       = "us-east-1"
+    use_lockfile = true
+    encrypt      = true
   }
 }
 
