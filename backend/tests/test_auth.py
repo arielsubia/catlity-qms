@@ -72,6 +72,7 @@ def make_token(
     tenant_id: str | None = "tenant-001",
     role: str | None = "auditor",
     groups: list[str] | None = None,
+    email: str = "user@example.com",
     audience: str = "test-client-id",
     issuer: str | None = None,
     expired: bool = False,
@@ -79,7 +80,7 @@ def make_token(
     now = int(time.time())
     claims: dict[str, Any] = {
         "sub": "user-sub-123",
-        "email": "user@example.com",
+        "email": email,
         "aud": audience,
         "iss": issuer or settings.cognito_issuer,
         "iat": now,
@@ -228,7 +229,18 @@ def test_tenant_id_is_scoped_to_token(
 # --- Registration endpoint --------------------------------------------------
 
 
-def test_register_creates_user(
+def _register_payload(tenant_id: str, **overrides: str) -> dict[str, str]:
+    payload = {
+        "email": "newuser@example.com",
+        "password": "SuperSecret123!",
+        "full_name": "New User",
+        "tenant_id": tenant_id,
+    }
+    payload.update(overrides)
+    return payload
+
+
+def test_register_creates_auditee_without_a_role(
     client: TestClient, db, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     tenant = Tenant(name="AutoCorp", industry="automotive")
@@ -241,19 +253,117 @@ def test_register_creates_user(
         lambda **kwargs: "cognito-sub-999",
     )
 
-    payload = {
-        "email": "newuser@example.com",
-        "password": "SuperSecret123!",
-        "full_name": "New User",
-        "tenant_id": tenant.id,
-        "role": "auditor",
-    }
-    resp = client.post("/api/v1/auth/register", json=payload)
+    resp = client.post("/api/v1/auth/register", json=_register_payload(tenant.id))
     assert resp.status_code == 201
     data = resp.json()
     assert data["email"] == "newuser@example.com"
-    assert data["role"] == "auditor"
+    assert data["role"] == "auditee"
     assert data["cognito_sub"] == "cognito-sub-999"
+
+
+def test_register_rejects_admin_without_authentication(
+    client: TestClient, db, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    tenant = Tenant(name="AutoCorp", industry="automotive")
+    db.add(tenant)
+    db.commit()
+    db.refresh(tenant)
+
+    def fail_if_called(**kwargs: object) -> str:
+        raise AssertionError("Cognito must not be called")
+
+    monkeypatch.setattr("app.api.v1.auth.cognito.register_user", fail_if_called)
+
+    resp = client.post(
+        "/api/v1/auth/register",
+        json=_register_payload(tenant.id, role="admin"),
+    )
+    assert resp.status_code == 403
+
+
+def test_register_admin_assigns_role_in_same_tenant(
+    client: TestClient, db, rsa_keypair: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    tenant = Tenant(name="AutoCorp", industry="automotive")
+    db.add(tenant)
+    db.commit()
+    db.refresh(tenant)
+
+    monkeypatch.setattr(
+        "app.api.v1.auth.cognito.register_user",
+        lambda **kwargs: "cognito-sub-999",
+    )
+    token = make_token(
+        rsa_keypair,
+        tenant_id=tenant.id,
+        role="admin",
+        email="admin@example.com",
+    )
+
+    resp = client.post(
+        "/api/v1/auth/register",
+        json=_register_payload(tenant.id, role="auditor"),
+        headers=_auth(token),
+    )
+    assert resp.status_code == 201
+    assert resp.json()["role"] == "auditor"
+
+
+def test_register_admin_cannot_assign_role_in_another_tenant(
+    client: TestClient, db, rsa_keypair: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    home = Tenant(name="AutoCorp", industry="automotive")
+    other = Tenant(name="PharmaCo", industry="pharmaceutical")
+    db.add_all([home, other])
+    db.commit()
+    db.refresh(home)
+    db.refresh(other)
+
+    monkeypatch.setattr(
+        "app.api.v1.auth.cognito.register_user",
+        lambda **kwargs: "cognito-sub-999",
+    )
+    token = make_token(
+        rsa_keypair,
+        tenant_id=home.id,
+        role="admin",
+        email="admin@example.com",
+    )
+
+    resp = client.post(
+        "/api/v1/auth/register",
+        json=_register_payload(other.id, role="auditor"),
+        headers=_auth(token),
+    )
+    assert resp.status_code == 403
+
+
+def test_user_cannot_change_own_tenant_or_role(
+    client: TestClient, db, rsa_keypair: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    tenant = Tenant(name="AutoCorp", industry="automotive")
+    db.add(tenant)
+    db.commit()
+    db.refresh(tenant)
+
+    def fail_if_called(**kwargs: object) -> str:
+        raise AssertionError("Cognito must not be called")
+
+    monkeypatch.setattr("app.api.v1.auth.cognito.register_user", fail_if_called)
+    token = make_token(
+        rsa_keypair,
+        tenant_id=tenant.id,
+        role="auditee",
+        email="user@example.com",
+    )
+
+    resp = client.post(
+        "/api/v1/auth/register",
+        json=_register_payload(tenant.id, email="user@example.com", role="admin"),
+        headers=_auth(token),
+    )
+    assert resp.status_code == 403
+    assert resp.json()["detail"] == "You cannot change your own tenant or role"
 
 
 def test_register_rejects_invalid_role(client: TestClient, db) -> None:
@@ -285,7 +395,6 @@ def test_register_rejects_unknown_tenant(
         "password": "SuperSecret123!",
         "full_name": "U",
         "tenant_id": "does-not-exist",
-        "role": "auditor",
     }
     resp = client.post("/api/v1/auth/register", json=payload)
     assert resp.status_code == 404

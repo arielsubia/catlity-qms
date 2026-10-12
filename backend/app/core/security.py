@@ -171,6 +171,19 @@ def get_current_user(
     )
 
 
+def get_optional_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
+) -> CurrentUser | None:
+    """Resolve the caller when a bearer token is present.
+
+    Public endpoints use this so anonymous requests stay anonymous. A token
+    that is present but invalid still fails with 401.
+    """
+    if credentials is None or not credentials.credentials:
+        return None
+    return get_current_user(credentials)
+
+
 def get_current_tenant_id(
     current_user: CurrentUser = Depends(get_current_user),
 ) -> str:

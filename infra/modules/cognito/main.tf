@@ -146,10 +146,9 @@ resource "aws_cognito_user_pool_client" "frontend" {
     "custom:role",
   ]
 
+  # Tenant and role are server-assigned. The app client must not write them.
   write_attributes = [
     "email",
-    "custom:tenant_id",
-    "custom:role",
   ]
 }
 
