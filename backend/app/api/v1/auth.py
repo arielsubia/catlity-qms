@@ -1,12 +1,15 @@
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.security import CurrentUser, get_current_user
+from app.core.security import CurrentUser, get_current_user, get_optional_user
 from app.models.tenant import Tenant
 from app.models.user import User
 from app.schemas.auth import (
     ALLOWED_ROLES,
+    DEFAULT_ROLE,
     CurrentUserResponse,
     RegisterRequest,
     RegisterResponse,
@@ -14,6 +17,10 @@ from app.schemas.auth import (
 from app.services import cognito
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+def _caller_is_admin(caller: CurrentUser) -> bool:
+    return "admin" in {caller.role, *caller.groups}
 
 
 @router.post(
@@ -24,12 +31,13 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 def register(
     payload: RegisterRequest,
     db: Session = Depends(get_db),
+    caller: Annotated[CurrentUser | None, Depends(get_optional_user)] = None,
 ) -> User:
     """Register a new user in Cognito and persist the local profile.
 
-    The user is scoped to an existing tenant and assigned a role that maps to a
-    Cognito group. Registration is rejected for unknown tenants or invalid
-    roles.
+    Anonymous callers can only create an auditee. Any other role requires an
+    admin of the same tenant. The caller cannot use this endpoint to change
+    their own tenant or role.
     """
     role = payload.normalized_role
     if role not in ALLOWED_ROLES:
@@ -37,6 +45,28 @@ def register(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"Invalid role. Allowed roles: {', '.join(ALLOWED_ROLES)}",
         )
+
+    if (
+        caller is not None
+        and caller.email is not None
+        and caller.email.casefold() == payload.email.casefold()
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You cannot change your own tenant or role",
+        )
+
+    if role != DEFAULT_ROLE:
+        if caller is None or not _caller_is_admin(caller):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Assigning a role other than auditee requires a tenant admin",
+            )
+        if caller.tenant_id != payload.tenant_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="A tenant admin can only assign roles inside their own organization",
+            )
 
     tenant = db.query(Tenant).filter(Tenant.id == payload.tenant_id).first()
     if not tenant:

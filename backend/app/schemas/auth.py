@@ -1,6 +1,7 @@
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 ALLOWED_ROLES = ("admin", "qa_manager", "auditor", "auditee")
+DEFAULT_ROLE = "auditee"
 
 
 class RegisterRequest(BaseModel):
