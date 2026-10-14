@@ -21,3 +21,44 @@ body {
   margin: 16px 0 0;
   text-align: center;
 }
+
+.app-layout {
+  min-height: 100svh;
+}
+
+.app-body {
+  position: relative;
+  flex: 1;
+}
+
+.app-body .ant-layout-sider-below {
+  position: absolute;
+  z-index: 10;
+  height: 100%;
+}
+
+.app-body .ant-layout-sider-zero-width-trigger {
+  top: auto;
+  bottom: 16px;
+}
+
+.app-sider-brand {
+  margin: 0;
+  padding: 16px;
+  overflow: hidden;
+  color: #fff;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.app-header-user {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  min-width: 0;
+}
+
+.app-content {
+  margin: 24px;
+}
