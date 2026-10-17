@@ -12,7 +12,7 @@ The MVP targets the quality industry (ISO 9001) with built-in extensibility for 
 The platform is composed of:
 
 - **Frontend**: React SPA with Ant Design, authentication via AWS Amplify/Cognito
-- **Backend**: REST API built with FastAPI, deployed on ECS/Fargate
+- **Backend**: REST API built with FastAPI, targeted for ECS/Fargate
 - **Database**: Amazon RDS PostgreSQL with multi-tenancy via `tenant_id`
 - **Storage**: S3 for documentary evidence, DynamoDB for metadata
 - **AI Agents**: 3 specialized agents on Amazon Bedrock with Knowledge Bases
@@ -27,7 +27,7 @@ The platform is composed of:
 | Layer | Technology |
 |-------|------------|
 | Frontend | React + TypeScript + AWS Amplify + Ant Design |
-| Backend API | FastAPI (Python) on ECS/Fargate |
+| Backend API | FastAPI (Python); ECS/Fargate is the target runtime |
 | Database | Amazon RDS PostgreSQL |
 | Documents/Evidence | Amazon S3 |
 | Metadata | Amazon DynamoDB |
@@ -35,8 +35,8 @@ The platform is composed of:
 | AI Agents | Amazon Bedrock + Knowledge Bases |
 | Dashboard | Amazon QuickSight |
 | IaC | Terraform |
-| CI/CD | GitHub Actions |
-| Cost Monitoring | AWS Cost Explorer + AWS Budgets |
+| CI/CD | GitHub Actions (no workflow committed yet) |
+| Cost Monitoring | AWS Cost Explorer. AWS Budgets is defined and not applied |
 
 ## Repository Structure
 
@@ -65,7 +65,7 @@ catlity-qms/
 │   ├── common/              # ISO 9001
 │   ├── automotive/          # IATF 16949
 │   └── pharmaceutical/      # GMP
-├── .github/workflows/       # CI/CD pipelines
+├── .github/workflows/       # reserved for CI workflows
 ├── .gitignore
 └── README.md
 ```
@@ -125,7 +125,7 @@ The backend uses a multi-tenant architecture with `tenant_id` on all tables:
 - **Checklist / ChecklistItem** — Audit template questions
 - **Evidence** — Documents/photos uploaded to S3
 
-See `docs/diagrams/exports/data-model-er.png` for the full ER diagram.
+See `docs/diagrams/data-model-erd.png` for the full ER diagram.
 
 #### Authentication & Authorization
 
@@ -201,7 +201,7 @@ still runs and shows a configuration warning on the sign-in screen.
 ### Infrastructure
 
 ```bash
-cd infra/environments/dev
+cd infra
 terraform init
 terraform plan
 terraform apply
