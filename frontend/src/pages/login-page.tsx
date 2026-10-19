@@ -1,5 +1,6 @@
 import { Alert, Button, Card, Form, Input, Typography } from 'antd'
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 import { AuthServiceError } from '../auth/auth-service'
 import { useAuth } from '../auth/use-auth'
@@ -10,12 +11,9 @@ interface LoginFormValues {
   password: string
 }
 
-interface LoginPageProps {
-  onSwitchToRegister: () => void
-}
-
-export const LoginPage = ({ onSwitchToRegister }: LoginPageProps) => {
+export const LoginPage = () => {
   const { signIn } = useAuth()
+  const navigate = useNavigate()
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
@@ -24,6 +22,7 @@ export const LoginPage = ({ onSwitchToRegister }: LoginPageProps) => {
     setSubmitting(true)
     try {
       await signIn(email, password)
+      navigate('/dashboard', { replace: true })
     } catch (err) {
       setError(err instanceof AuthServiceError ? err.message : 'Unexpected error while signing in.')
     } finally {
@@ -66,7 +65,7 @@ export const LoginPage = ({ onSwitchToRegister }: LoginPageProps) => {
       </Form>
       <Typography.Paragraph className="auth-switch">
         No account yet?{' '}
-        <Button type="link" onClick={onSwitchToRegister}>
+        <Button type="link" onClick={() => navigate('/register')}>
           Create one
         </Button>
       </Typography.Paragraph>

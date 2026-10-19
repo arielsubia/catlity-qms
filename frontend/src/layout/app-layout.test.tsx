@@ -1,10 +1,13 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 
 import { AuthContext, type AuthContextValue } from '../auth/auth-context'
 import type { SessionUser } from '../auth/auth-service'
+import { SectionPage } from '../pages/section-page'
 import { AppLayout } from './app-layout'
+import { NAV_ITEMS } from './nav-items'
 
 const user: SessionUser = {
   email: 'ana@acme.com',
@@ -28,13 +31,27 @@ const installMatchMedia = (matches: (query: string) => boolean) => {
   })
 }
 
-const renderLayout = (signOut: AuthContextValue['signOut'] = vi.fn()) => {
+const renderLayout = (signOut: AuthContextValue['signOut'] = vi.fn(), path = '/dashboard') => {
   const value: AuthContextValue = { user, signIn: vi.fn(), signOut }
+  const router = createMemoryRouter(
+    [
+      {
+        element: <AppLayout />,
+        children: NAV_ITEMS.map((item) => ({
+          path: item.path.slice(1),
+          element: <SectionPage />,
+        })),
+      },
+      { path: 'login', element: <h1>Sign in</h1> },
+    ],
+    { initialEntries: [path] },
+  )
   render(
     <AuthContext.Provider value={value}>
-      <AppLayout />
+      <RouterProvider router={router} />
     </AuthContext.Provider>,
   )
+  return router
 }
 
 describe('AppLayout', () => {
@@ -45,8 +62,9 @@ describe('AppLayout', () => {
   it('lists the main sections', () => {
     renderLayout()
 
-    for (const label of ['Dashboard', 'Audits', 'Findings', 'Evidence', 'AI Agent', 'Settings']) {
-      expect(screen.getByRole('menuitem', { name: label })).toBeInTheDocument()
+    for (const item of NAV_ITEMS) {
+      expect(screen.getByRole('menuitem', { name: item.label })).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: item.label })).toHaveAttribute('href', item.path)
     }
   })
 
@@ -61,21 +79,23 @@ describe('AppLayout', () => {
 
   it('signs the user out from the header', async () => {
     const signOut = vi.fn()
-    renderLayout(signOut)
+    const router = renderLayout(signOut)
 
     await userEvent.click(screen.getByRole('button', { name: 'Sign out' }))
 
     expect(signOut).toHaveBeenCalledOnce()
+    expect(router.state.location.pathname).toBe('/login')
   })
 
   it('switches the content title from the sidebar', async () => {
-    renderLayout()
+    const router = renderLayout()
 
     expect(screen.getByRole('heading', { level: 2, name: 'Dashboard' })).toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('menuitem', { name: 'Findings' }))
 
     expect(screen.getByRole('heading', { level: 2, name: 'Findings' })).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/findings')
   })
 
   it('opens the menu from the header on a narrow viewport', async () => {
