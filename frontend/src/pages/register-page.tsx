@@ -1,15 +1,13 @@
 import { Alert, Button, Card, Form, Input, Typography } from 'antd'
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 import { RegisterError, registerUser, type RegisterInput } from '../api/auth-api'
 
 const MIN_PASSWORD_LENGTH = 12
 
-interface RegisterPageProps {
-  onSwitchToLogin: () => void
-}
-
-export const RegisterPage = ({ onSwitchToLogin }: RegisterPageProps) => {
+export const RegisterPage = () => {
+  const navigate = useNavigate()
   const [error, setError] = useState<string | null>(null)
   const [registered, setRegistered] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -31,7 +29,7 @@ export const RegisterPage = ({ onSwitchToLogin }: RegisterPageProps) => {
     return (
       <Card title="Account created" className="auth-card">
         <Alert type="success" showIcon className="auth-alert" title="You can sign in now." />
-        <Button type="primary" block onClick={onSwitchToLogin}>
+        <Button type="primary" block onClick={() => navigate('/login')}>
           Go to sign in
         </Button>
       </Card>
@@ -88,7 +86,7 @@ export const RegisterPage = ({ onSwitchToLogin }: RegisterPageProps) => {
       </Form>
       <Typography.Paragraph className="auth-switch">
         Already have an account?{' '}
-        <Button type="link" onClick={onSwitchToLogin}>
+        <Button type="link" onClick={() => navigate('/login')}>
           Sign in
         </Button>
       </Typography.Paragraph>

@@ -1,36 +1,36 @@
 import { Button, Layout, Menu, Typography } from 'antd'
 import { useState } from 'react'
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 
 import { useAuth } from '../auth/use-auth'
-import { NAV_ITEMS, type SectionKey } from './nav-items'
+import { NAV_ITEMS } from './nav-items'
 
 const { Content, Header, Sider } = Layout
 
-const isSectionKey = (key: string): key is SectionKey => NAV_ITEMS.some((item) => item.key === key)
-
 export const AppLayout = () => {
   const { user, signOut } = useAuth()
-  const [section, setSection] = useState<SectionKey>('dashboard')
+  const { pathname } = useLocation()
+  const navigate = useNavigate()
   const [collapsed, setCollapsed] = useState(false)
   const [isCompact, setIsCompact] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
-
-  const current = NAV_ITEMS.find((item) => item.key === section) ?? NAV_ITEMS[0]
 
   const handleSignOut = async () => {
     setSigningOut(true)
     try {
       await signOut()
+      navigate('/login', { replace: true })
     } finally {
       setSigningOut(false)
     }
   }
 
   const handleMenuClick = ({ key }: { key: string }) => {
-    if (!isSectionKey(key)) {
+    const item = NAV_ITEMS.find((entry) => entry.path === key)
+    if (!item) {
       return
     }
-    setSection(key)
+    navigate(item.path)
     if (isCompact) {
       setCollapsed(true)
     }
@@ -86,14 +86,16 @@ export const AppLayout = () => {
           <Menu
             theme="dark"
             mode="inline"
-            selectedKeys={[section]}
-            items={NAV_ITEMS.map((item) => ({ key: item.key, label: item.label }))}
+            selectedKeys={[pathname]}
+            items={NAV_ITEMS.map((item) => ({
+              key: item.path,
+              label: <Link to={item.path}>{item.label}</Link>,
+            }))}
             onClick={handleMenuClick}
           />
         </Sider>
         <Content className="app-content">
-          <Typography.Title level={2}>{current.label}</Typography.Title>
-          <Typography.Paragraph>This section is not available yet.</Typography.Paragraph>
+          <Outlet />
         </Content>
       </Layout>
     </Layout>
