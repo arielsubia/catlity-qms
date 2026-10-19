@@ -1,6 +1,9 @@
 from datetime import date, datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
+
+AuditStatus = Literal["planned", "in_progress", "completed", "closed"]
 
 
 class AuditCreate(BaseModel):
@@ -25,6 +28,12 @@ class AuditUpdate(BaseModel):
     planned_date: date | None = None
 
 
+class AuditStatusUpdate(BaseModel):
+    """Target status for one forward transition."""
+
+    status: AuditStatus
+
+
 class AuditResponse(BaseModel):
     """Audit returned to the client."""
 
@@ -36,6 +45,7 @@ class AuditResponse(BaseModel):
     description: str | None
     audit_type: str
     status: str
+    status_changed_at: datetime | None
     planned_date: date | None
     completion_date: date | None
     auditor_id: str | None

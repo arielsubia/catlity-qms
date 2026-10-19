@@ -1,6 +1,6 @@
-from datetime import date
+from datetime import date, datetime
 
-from sqlalchemy import Date, ForeignKey, String, Text
+from sqlalchemy import Date, DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, generate_uuid
@@ -24,6 +24,9 @@ class Audit(Base, TimestampMixin):
     )
     status: Mapped[str] = mapped_column(
         String(50), nullable=False, default="planned"
+    )
+    status_changed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
     )
     planned_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     completion_date: Mapped[date | None] = mapped_column(Date, nullable=True)
