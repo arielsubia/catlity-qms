@@ -119,7 +119,7 @@ The backend uses a multi-tenant architecture with `tenant_id` on all tables:
 
 - **Tenant** — Organization using the platform
 - **User** — Team member linked to a tenant (roles: admin, auditor, auditee, qa_manager)
-- **Audit** — Audit session with state machine (planned → in_progress → completed → closed)
+- **Audit** — Audit session with state machine (planned → in_progress → completed → closed). Each transition stores `status_changed_at`. See `docs/diagrams/audit-state-machine.png`.
 - **Finding** — Non-conformity or observation (types: major_nc, minor_nc, observation, improvement_opportunity)
 - **CorrectiveAction** — Action plan for a finding
 - **Checklist / ChecklistItem** — Audit template questions
@@ -151,8 +151,9 @@ Relevant endpoints:
 | `GET`  | `/api/v1/audits/` | List that tenant's audits. Query: `skip`, `limit`, optional `status` and `audit_type` |
 | `GET`  | `/api/v1/audits/{audit_id}` | Return one audit when it belongs to the token tenant |
 | `PATCH` | `/api/v1/audits/{audit_id}` | Update title, description, audit type, or planned date |
+| `PATCH` | `/api/v1/audits/{audit_id}/status` | Move one step forward: `planned` → `in_progress` → `completed` → `closed`. Roles: `auditor`, `admin`. Invalid transitions return 422 and each change stores `status_changed_at` |
 
-Audit rows stay in PostgreSQL. In local development that database is the Docker Compose Postgres service, not Amazon RDS. These four routes do not call AWS and do not add IAM permissions. They read `custom:tenant_id` from the Cognito JWT the API already validates. There is no delete route. Status changes and auditor assignment are separate API work. This change adds **$0/month**: the User Pool and the Terraform state bucket stay as they are, and VPC, NAT Gateway, and RDS remain unapplied. Check it with `pytest tests/test_audits.py -v` from `backend/`. A passing run does not require `terraform plan` or `terraform apply`.
+Audit rows stay in PostgreSQL. In local development that database is the Docker Compose Postgres service, not Amazon RDS. These routes do not call AWS and do not add IAM permissions. They read `custom:tenant_id` and `custom:role` from the Cognito JWT the API already validates. There is no delete route. Auditor assignment is separate API work. The `status_changed_at` column is added by an Alembic migration against the local database. This change adds **$0/month**: the User Pool and the Terraform state bucket stay as they are, and VPC, NAT Gateway, and RDS remain unapplied. Check it with `pytest tests/test_audits.py tests/test_audit_status.py -v` from `backend/`. A passing run does not require `terraform plan` or `terraform apply`.
 
 Required environment variables (see `backend/.env.example`):
 

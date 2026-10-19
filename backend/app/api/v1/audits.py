@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -6,13 +7,29 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.security import CurrentUser, get_current_tenant_id, require_role
 from app.models.audit import Audit
-from app.schemas.audit import AuditCreate, AuditListResponse, AuditResponse, AuditUpdate
+from app.schemas.audit import (
+    AuditCreate,
+    AuditListResponse,
+    AuditResponse,
+    AuditStatusUpdate,
+    AuditUpdate,
+)
 
 router = APIRouter(prefix="/audits", tags=["audits"])
 
 # Creating an audit is limited to these roles. Listing and editing stay
 # available to any authenticated member of the tenant.
 AUDIT_CREATOR_ROLES = ["auditor", "admin", "qa_manager"]
+AUDIT_STATUS_ROLES = ["auditor", "admin"]
+AUDIT_TRANSITIONS = {
+    "planned": "in_progress",
+    "in_progress": "completed",
+    "completed": "closed",
+}
+
+
+def _utcnow() -> datetime:
+    return datetime.now(UTC)
 
 
 def _get_tenant_audit(db: Session, audit_id: str, tenant_id: str) -> Audit:
@@ -114,6 +131,33 @@ def update_audit(
     update_data = audit_in.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(audit, field, value)
+    db.commit()
+    db.refresh(audit)
+    return audit
+
+
+@router.patch("/{audit_id}/status", response_model=AuditResponse)
+def update_audit_status(
+    audit_id: str,
+    status_in: AuditStatusUpdate,
+    current_user: CurrentUser = Depends(require_role(AUDIT_STATUS_ROLES)),
+    db: Session = Depends(get_db),
+) -> Audit:
+    """Move an audit one step forward and record the transition time.
+
+    Allowed path: planned, in_progress, completed, closed. Any other change
+    returns 422. Only an auditor or an admin of the owning tenant can call
+    this route.
+    """
+    audit = _get_tenant_audit(db, audit_id, current_user.tenant_id)
+    allowed = AUDIT_TRANSITIONS.get(audit.status)
+    if allowed != status_in.status:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Cannot change status from {audit.status} to {status_in.status}",
+        )
+    audit.status = status_in.status
+    audit.status_changed_at = _utcnow()
     db.commit()
     db.refresh(audit)
     return audit
