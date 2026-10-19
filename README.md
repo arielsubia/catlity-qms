@@ -147,6 +147,12 @@ Relevant endpoints:
 |--------|------|-------------|
 | `POST` | `/api/v1/auth/register` | Provision a user in Cognito and persist the local profile |
 | `GET`  | `/api/v1/auth/me` | Return the authenticated principal (tenant, role, groups) |
+| `POST` | `/api/v1/audits/` | Create an audit for the token tenant. Roles: `auditor`, `admin`, `qa_manager`. Status is always `planned` |
+| `GET`  | `/api/v1/audits/` | List that tenant's audits. Query: `skip`, `limit`, optional `status` and `audit_type` |
+| `GET`  | `/api/v1/audits/{audit_id}` | Return one audit when it belongs to the token tenant |
+| `PATCH` | `/api/v1/audits/{audit_id}` | Update title, description, audit type, or planned date |
+
+Audit rows stay in PostgreSQL. In local development that database is the Docker Compose Postgres service, not Amazon RDS. These four routes do not call AWS and do not add IAM permissions. They read `custom:tenant_id` from the Cognito JWT the API already validates. There is no delete route. Status changes and auditor assignment are separate API work. This change adds **$0/month**: the User Pool and the Terraform state bucket stay as they are, and VPC, NAT Gateway, and RDS remain unapplied. Check it with `pytest tests/test_audits.py -v` from `backend/`. A passing run does not require `terraform plan` or `terraform apply`.
 
 Required environment variables (see `backend/.env.example`):
 
