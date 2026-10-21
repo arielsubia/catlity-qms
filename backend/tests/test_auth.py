@@ -73,13 +73,14 @@ def make_token(
     role: str | None = "auditor",
     groups: list[str] | None = None,
     email: str = "user@example.com",
+    sub: str = "user-sub-123",
     audience: str = "test-client-id",
     issuer: str | None = None,
     expired: bool = False,
 ) -> str:
     now = int(time.time())
     claims: dict[str, Any] = {
-        "sub": "user-sub-123",
+        "sub": sub,
         "email": email,
         "aud": audience,
         "iss": issuer or settings.cognito_issuer,

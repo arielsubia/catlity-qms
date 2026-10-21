@@ -10,7 +10,7 @@ class AuditCreate(BaseModel):
     """Fields the client may set when opening an audit.
 
     Status is not accepted here. The API always stores ``planned``.
-    Auditor assignment belongs to a later story.
+    The executing auditor is assigned on a separate route.
     """
 
     title: str = Field(..., min_length=1, max_length=255)
@@ -32,6 +32,23 @@ class AuditStatusUpdate(BaseModel):
     """Target status for one forward transition."""
 
     status: AuditStatus
+
+
+class AuditAssignment(BaseModel):
+    """Auditor who will execute the audit. The caller must be a lead_auditor."""
+
+    auditor_id: str = Field(..., min_length=1, max_length=36)
+
+
+class AvailableAuditor(BaseModel):
+    """An auditor the lead auditor can assign inside the tenant."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    full_name: str
+    email: str
+    role: str
 
 
 class AuditResponse(BaseModel):

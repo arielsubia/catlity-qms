@@ -9,10 +9,13 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 from jose import jwk
+from sqlalchemy.orm import Session
 
 from app.api.v1 import audits as audits_api
 from app.core import security
 from app.core.config import settings
+from app.models.audit import Audit
+from app.models.user import User
 from tests.test_auth import make_token
 
 
@@ -88,6 +91,25 @@ def _create_audit(client: TestClient, token: str) -> dict[str, Any]:
     return response.json()
 
 
+def _own_the_audit(
+    db: Session, tenant_id: str, audit_id: str, sub: str = "user-sub-123"
+) -> None:
+    """Attach the token subject as the auditor who executes this audit."""
+    user = User(
+        tenant_id=tenant_id,
+        cognito_sub=sub,
+        email=f"{sub}@example.com",
+        full_name="Assigned auditor",
+        role="auditor",
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    audit = db.query(Audit).filter(Audit.id == audit_id).one()
+    audit.auditor_id = user.id
+    db.commit()
+
+
 def _change_status(
     client: TestClient, token: str, audit_id: str, new_status: str
 ) -> Any:
@@ -110,6 +132,7 @@ def test_new_audit_has_no_status_timestamp(
 
 def test_forward_transitions_record_each_timestamp(
     client: TestClient,
+    db: Session,
     rsa_keypair: dict[str, Any],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -125,6 +148,7 @@ def test_forward_transitions_record_each_timestamp(
     tenant_id = _create_tenant(client, "Flow Org")
     token = _token(rsa_keypair, tenant_id)
     audit_id = _create_audit(client, token)["id"]
+    _own_the_audit(db, tenant_id, audit_id)
 
     started = _change_status(client, token, audit_id, "in_progress")
     assert started.status_code == 200
@@ -156,6 +180,7 @@ def test_forward_transitions_record_each_timestamp(
 )
 def test_invalid_transition_returns_422(
     client: TestClient,
+    db: Session,
     rsa_keypair: dict[str, Any],
     current: str,
     target: str,
@@ -163,6 +188,7 @@ def test_invalid_transition_returns_422(
     tenant_id = _create_tenant(client, f"Invalid {current} {target}")
     token = _token(rsa_keypair, tenant_id)
     audit_id = _create_audit(client, token)["id"]
+    _own_the_audit(db, tenant_id, audit_id)
     for step in ("in_progress", "completed", "closed"):
         if current == "planned":
             break
@@ -191,18 +217,19 @@ def test_unknown_status_returns_422(
 
 @pytest.mark.parametrize("role", ["auditor", "admin"])
 def test_auditor_and_admin_can_change_status(
-    client: TestClient, rsa_keypair: dict[str, Any], role: str
+    client: TestClient, db: Session, rsa_keypair: dict[str, Any], role: str
 ) -> None:
     tenant_id = _create_tenant(client, f"Role {role}")
     creator = _token(rsa_keypair, tenant_id, role="auditor")
     audit_id = _create_audit(client, creator)["id"]
+    _own_the_audit(db, tenant_id, audit_id)
     actor = _token(rsa_keypair, tenant_id, role=role)
     response = _change_status(client, actor, audit_id, "in_progress")
     assert response.status_code == 200
     assert response.json()["status"] == "in_progress"
 
 
-@pytest.mark.parametrize("role", ["qa_manager", "auditee"])
+@pytest.mark.parametrize("role", ["qa_manager", "auditee", "lead_auditor"])
 def test_other_roles_cannot_change_status(
     client: TestClient, rsa_keypair: dict[str, Any], role: str
 ) -> None:

@@ -104,6 +104,13 @@ resource "aws_cognito_user_group" "auditee" {
   precedence   = 4
 }
 
+resource "aws_cognito_user_group" "lead_auditor" {
+  name         = "lead_auditor"
+  user_pool_id = aws_cognito_user_pool.main.id
+  description  = "Heads of the internal audit function who assign auditors"
+  precedence   = 5
+}
+
 # --- App Client (frontend SPA, no client secret for public client) ---
 
 resource "aws_cognito_user_pool_client" "frontend" {

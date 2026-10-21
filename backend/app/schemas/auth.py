@@ -1,6 +1,6 @@
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
-ALLOWED_ROLES = ("admin", "qa_manager", "auditor", "auditee")
+ALLOWED_ROLES = ("admin", "qa_manager", "lead_auditor", "auditor", "auditee")
 DEFAULT_ROLE = "auditee"
 
 

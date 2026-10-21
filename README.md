@@ -118,7 +118,7 @@ The API will be available at `http://localhost:8000` with interactive docs at `/
 The backend uses a multi-tenant architecture with `tenant_id` on all tables:
 
 - **Tenant** — Organization using the platform
-- **User** — Team member linked to a tenant (roles: admin, auditor, auditee, qa_manager)
+- **User** — Team member linked to a tenant (roles: admin, lead_auditor, auditor, auditee, qa_manager)
 - **Audit** — Audit session with state machine (planned → in_progress → completed → closed). Each transition stores `status_changed_at`. See `docs/diagrams/audit-state-machine.png`.
 - **Finding** — Non-conformity or observation (types: major_nc, minor_nc, observation, improvement_opportunity)
 - **CorrectiveAction** — Action plan for a finding
@@ -136,7 +136,7 @@ issuer, and audience) and derives the caller's identity from Cognito claims.
 
 - **Tenant isolation**: the `custom:tenant_id` claim is required on every token
   and scopes all data access.
-- **Roles**: `admin`, `qa_manager`, `auditor`, `auditee` — carried in the
+- **Roles**: `admin`, `qa_manager`, `lead_auditor`, `auditor`, `auditee` — carried in the
   `custom:role` attribute and mirrored as Cognito groups.
 - **Role enforcement**: routes declare `Depends(require_role([...]))`; access is
   granted when the user's role or group matches.
@@ -147,13 +147,15 @@ Relevant endpoints:
 |--------|------|-------------|
 | `POST` | `/api/v1/auth/register` | Provision a user in Cognito and persist the local profile |
 | `GET`  | `/api/v1/auth/me` | Return the authenticated principal (tenant, role, groups) |
-| `POST` | `/api/v1/audits/` | Create an audit for the token tenant. Roles: `auditor`, `admin`, `qa_manager`. Status is always `planned` |
-| `GET`  | `/api/v1/audits/` | List that tenant's audits. Query: `skip`, `limit`, optional `status` and `audit_type` |
+| `POST` | `/api/v1/audits/` | Create an audit for the token tenant. Roles: `auditor`, `admin`, `lead_auditor`. Status is always `planned`. A `qa_manager` cannot create |
+| `GET`  | `/api/v1/audits/` | List that tenant's audits. Query: `skip`, `limit`, optional `status`, `audit_type`, and `mine` |
 | `GET`  | `/api/v1/audits/{audit_id}` | Return one audit when it belongs to the token tenant |
-| `PATCH` | `/api/v1/audits/{audit_id}` | Update title, description, audit type, or planned date |
-| `PATCH` | `/api/v1/audits/{audit_id}/status` | Move one step forward: `planned` → `in_progress` → `completed` → `closed`. Roles: `auditor`, `admin`. Invalid transitions return 422 and each change stores `status_changed_at` |
+| `PATCH` | `/api/v1/audits/{audit_id}` | Update title, description, audit type, or planned date. A `qa_manager` can only view |
+| `PATCH` | `/api/v1/audits/{audit_id}/auditor` | Assign `auditor_id`. Role: `lead_auditor`. The user must be an active `auditor` of the same tenant |
+| `PATCH` | `/api/v1/audits/{audit_id}/status` | Move one step forward: `planned` → `in_progress` → `completed` → `closed`. The assigned auditor, or a tenant `admin`, may move it. Invalid transitions return 422 and each change stores `status_changed_at` |
+| `GET`  | `/api/v1/auditors/` | List active auditors of the token tenant. Roles: `lead_auditor`, `admin` |
 
-Audit rows stay in PostgreSQL. In local development that database is the Docker Compose Postgres service, not Amazon RDS. These routes do not call AWS and do not add IAM permissions. They read `custom:tenant_id` and `custom:role` from the Cognito JWT the API already validates. There is no delete route. Auditor assignment is separate API work. The `status_changed_at` column is added by an Alembic migration against the local database. This change adds **$0/month**: the User Pool and the Terraform state bucket stay as they are, and VPC, NAT Gateway, and RDS remain unapplied. Check it with `pytest tests/test_audits.py tests/test_audit_status.py -v` from `backend/`. A passing run does not require `terraform plan` or `terraform apply`.
+Audit rows stay in PostgreSQL. In local development that database is the Docker Compose Postgres service, not Amazon RDS. These routes do not call AWS on each request and do not add IAM permissions. They read `custom:tenant_id` and `custom:role` from the Cognito JWT the API already validates. There is no delete route and no `lead_auditor_id` column. The executing auditor is `auditor_id`, which already existed. The `lead_auditor` role is a new group in the existing Cognito module. Applying that group updates User Pool `us-east-1_oa6gNvB4B` only, with `terraform apply -target=module.cognito`. A Cognito group has no monthly charge. VPC, NAT Gateway, and RDS remain unapplied, so this change stays at **$0/month**. Check the API with `pytest tests/test_audits.py tests/test_audit_status.py tests/test_audit_assignment.py -v` from `backend/`. A passing run does not require `terraform apply`.
 
 Required environment variables (see `backend/.env.example`):
 
