@@ -119,7 +119,7 @@ def test_create_audit_starts_as_planned(
     assert data["completion_date"] is None
 
 
-@pytest.mark.parametrize("role", ["auditor", "admin", "qa_manager"])
+@pytest.mark.parametrize("role", ["auditor", "admin", "lead_auditor"])
 def test_create_audit_allowed_roles(
     client: TestClient, rsa_keypair: dict[str, Any], role: str
 ) -> None:
@@ -127,6 +127,19 @@ def test_create_audit_allowed_roles(
     token = _token(rsa_keypair, tenant_id, role=role)
     created = _create_audit(client, token, title=f"Audit by {role}")
     assert created["status"] == "planned"
+
+
+def test_qa_manager_cannot_create_audit(
+    client: TestClient, rsa_keypair: dict[str, Any]
+) -> None:
+    tenant_id = _create_tenant(client, "Quality Org")
+    token = _token(rsa_keypair, tenant_id, role="qa_manager")
+    response = client.post(
+        "/api/v1/audits/",
+        json={"title": "Should fail"},
+        headers=_auth(token),
+    )
+    assert response.status_code == 403
 
 
 def test_auditee_cannot_create_audit(

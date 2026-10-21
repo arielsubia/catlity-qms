@@ -5,9 +5,16 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.security import CurrentUser, get_current_tenant_id, require_role
+from app.core.security import (
+    CurrentUser,
+    get_current_tenant_id,
+    get_current_user,
+    require_role,
+)
 from app.models.audit import Audit
+from app.models.user import User
 from app.schemas.audit import (
+    AuditAssignment,
     AuditCreate,
     AuditListResponse,
     AuditResponse,
@@ -17,9 +24,9 @@ from app.schemas.audit import (
 
 router = APIRouter(prefix="/audits", tags=["audits"])
 
-# Creating an audit is limited to these roles. Listing and editing stay
-# available to any authenticated member of the tenant.
-AUDIT_CREATOR_ROLES = ["auditor", "admin", "qa_manager"]
+# The QA manager consults audits and does not create, edit, or assign them.
+AUDIT_CREATOR_ROLES = ["auditor", "admin", "lead_auditor"]
+AUDIT_ASSIGN_ROLES = ["lead_auditor"]
 AUDIT_STATUS_ROLES = ["auditor", "admin"]
 AUDIT_TRANSITIONS = {
     "planned": "in_progress",
@@ -30,6 +37,22 @@ AUDIT_TRANSITIONS = {
 
 def _utcnow() -> datetime:
     return datetime.now(UTC)
+
+
+def _local_auditor(db: Session, current_user: CurrentUser) -> User | None:
+    """Return the caller's local profile when it is an active auditor."""
+    if not current_user.sub:
+        return None
+    return (
+        db.query(User)
+        .filter(
+            User.cognito_sub == current_user.sub,
+            User.tenant_id == current_user.tenant_id,
+            User.role == "auditor",
+            User.is_active.is_(True),
+        )
+        .first()
+    )
 
 
 def _get_tenant_audit(db: Session, audit_id: str, tenant_id: str) -> Audit:
@@ -82,15 +105,21 @@ def list_audits(
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
     audit_status: Annotated[str | None, Query(alias="status", max_length=50)] = None,
     audit_type: Annotated[str | None, Query(max_length=50)] = None,
-    current_tenant_id: str = Depends(get_current_tenant_id),
+    mine: Annotated[bool, Query()] = False,
+    current_user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> AuditListResponse:
     """List audits for the tenant claim ``custom:tenant_id``.
 
     ``skip`` and ``limit`` page the result. ``status`` and ``audit_type`` are
-    optional read filters. They do not change an audit's state.
+    optional read filters. ``mine`` keeps only audits assigned to the caller.
     """
-    query = db.query(Audit).filter(Audit.tenant_id == current_tenant_id)
+    query = db.query(Audit).filter(Audit.tenant_id == current_user.tenant_id)
+    if mine:
+        executor = _local_auditor(db, current_user)
+        if executor is None:
+            return AuditListResponse(items=[], total=0, skip=skip, limit=limit)
+        query = query.filter(Audit.auditor_id == executor.id)
     if audit_status:
         query = query.filter(Audit.status == audit_status)
     if audit_type:
@@ -120,14 +149,20 @@ def get_audit(
 def update_audit(
     audit_id: str,
     audit_in: AuditUpdate,
-    current_tenant_id: str = Depends(get_current_tenant_id),
+    current_user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Audit:
     """Update descriptive fields of an audit in the caller's tenant.
 
-    Status transitions and auditor assignment are not applied here.
+    A QA manager can read audits and cannot edit them. Status transitions
+    and auditor assignment are not applied here.
     """
-    audit = _get_tenant_audit(db, audit_id, current_tenant_id)
+    if current_user.role == "qa_manager":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="A QA manager can only view audits",
+        )
+    audit = _get_tenant_audit(db, audit_id, current_user.tenant_id)
     update_data = audit_in.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(audit, field, value)
@@ -146,10 +181,18 @@ def update_audit_status(
     """Move an audit one step forward and record the transition time.
 
     Allowed path: planned, in_progress, completed, closed. Any other change
-    returns 422. Only an auditor or an admin of the owning tenant can call
-    this route.
+    returns 422. The assigned auditor may move that audit. An admin of the
+    tenant may move any of its audits. A lead auditor can read status and
+    cannot change it.
     """
     audit = _get_tenant_audit(db, audit_id, current_user.tenant_id)
+    if current_user.role != "admin":
+        executor = _local_auditor(db, current_user)
+        if executor is None or audit.auditor_id != executor.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only the assigned auditor can change this audit's status",
+            )
     allowed = AUDIT_TRANSITIONS.get(audit.status)
     if allowed != status_in.status:
         raise HTTPException(
@@ -158,6 +201,40 @@ def update_audit_status(
         )
     audit.status = status_in.status
     audit.status_changed_at = _utcnow()
+    db.commit()
+    db.refresh(audit)
+    return audit
+
+
+@router.patch("/{audit_id}/auditor", response_model=AuditResponse)
+def assign_auditor(
+    audit_id: str,
+    assignment: AuditAssignment,
+    current_user: CurrentUser = Depends(require_role(AUDIT_ASSIGN_ROLES)),
+    db: Session = Depends(get_db),
+) -> Audit:
+    """Assign the auditor who will execute an audit in the caller's tenant.
+
+    Only a lead auditor can assign, and only an active auditor of the same
+    tenant can be stored in ``auditor_id``.
+    """
+    audit = _get_tenant_audit(db, audit_id, current_user.tenant_id)
+    assignee = (
+        db.query(User)
+        .filter(
+            User.id == assignment.auditor_id,
+            User.tenant_id == current_user.tenant_id,
+            User.role == "auditor",
+            User.is_active.is_(True),
+        )
+        .first()
+    )
+    if assignee is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Only an active auditor of this tenant can be assigned",
+        )
+    audit.auditor_id = assignee.id
     db.commit()
     db.refresh(audit)
     return audit
