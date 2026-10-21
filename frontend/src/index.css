@@ -63,3 +63,27 @@ body {
 .app-content {
   margin: 24px;
 }
+
+.audits-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.audits-header h2 {
+  margin-bottom: 0;
+}
+
+.audits-toolbar {
+  margin-bottom: 8px;
+}
+
+.audits-note {
+  margin-top: 16px;
+}
+
+.audits-assign {
+  margin-top: 16px;
+}

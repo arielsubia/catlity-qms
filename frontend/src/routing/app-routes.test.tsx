@@ -2,12 +2,22 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { MemoryRouter } from 'react-router-dom'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { AuthContext, type AuthContextValue } from '../auth/auth-context'
 import type { SessionUser } from '../auth/auth-service'
 import { NAV_ITEMS } from '../layout/nav-items'
 import { AppRoutes } from './app-routes'
+
+vi.mock('../api/audits-api', () => ({
+  listAudits: vi.fn().mockResolvedValue({ items: [], total: 0, skip: 0, limit: 10 }),
+  listAuditors: vi.fn().mockResolvedValue([]),
+  getAudit: vi.fn(),
+  createAudit: vi.fn(),
+  updateAudit: vi.fn(),
+  assignAuditor: vi.fn(),
+  updateAuditStatus: vi.fn(),
+}))
 
 const signedInUser: SessionUser = {
   email: 'ana@acme.com',
@@ -68,15 +78,23 @@ describe('AppRoutes', () => {
     },
   )
 
-  it.each(NAV_ITEMS.map((item) => [item.path, item.label] as const))(
-    'renders the %s placeholder for a signed-in user',
-    (path, label) => {
-      renderRoutes(path, signedInUser)
+  it.each(
+    NAV_ITEMS.filter((item) => item.path !== '/audits').map(
+      (item) => [item.path, item.label] as const,
+    ),
+  )('renders the %s placeholder for a signed-in user', (path, label) => {
+    renderRoutes(path, signedInUser)
 
-      expect(screen.getByRole('heading', { level: 2, name: label })).toBeInTheDocument()
-      expect(screen.getByText('This section is not available yet.')).toBeInTheDocument()
-    },
-  )
+    expect(screen.getByRole('heading', { level: 2, name: label })).toBeInTheDocument()
+    expect(screen.getByText('This section is not available yet.')).toBeInTheDocument()
+  })
+
+  it('renders the audits screen for a signed-in user', async () => {
+    renderRoutes('/audits', signedInUser)
+
+    expect(await screen.findByRole('heading', { level: 2, name: 'Audits' })).toBeInTheDocument()
+    expect(screen.queryByText('This section is not available yet.')).not.toBeInTheDocument()
+  })
 
   it.each(['/', '/missing'])('sends %s to login without a session', (path) => {
     renderRoutes(path, null)
