@@ -6,6 +6,15 @@ afterEach(() => {
   cleanup()
 })
 
+// jsdom lacks the observers Ant Design uses for layout.
+class ResizeObserverStub {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+
+window.ResizeObserver = ResizeObserverStub
+
 // jsdom lacks matchMedia, which Ant Design uses for responsive behavior.
 Object.defineProperty(window, 'matchMedia', {
   writable: true,

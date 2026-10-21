@@ -207,6 +207,11 @@ ends the session. Registration goes through `POST /api/v1/auth/register` so the
 tenant and role are assigned server-side. Without the Cognito variables the app
 still runs and shows a configuration warning on the sign-in screen.
 
+The Audits screen calls the local API (`/api/v1/audits` and `/api/v1/auditors`)
+with the Cognito ID token. It adds no AWS resource and no IAM permission.
+Estimated cost stays **$0/month**. RDS and NAT remain unapplied. The dev User
+Pool is `us-east-1_oa6gNvB4B`.
+
 ### Infrastructure
 
 ```bash

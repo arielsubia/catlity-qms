@@ -5,6 +5,7 @@ import { NAV_ITEMS } from '../layout/nav-items'
 import { PublicLayout } from '../layout/public-layout'
 import { LoginPage } from '../pages/login-page'
 import { RegisterPage } from '../pages/register-page'
+import { AuditsPage } from '../pages/audits-page'
 import { SectionPage } from '../pages/section-page'
 import { GuestOnly, RequireAuth, SessionRedirect } from './guards'
 
@@ -19,7 +20,11 @@ export const AppRoutes = () => (
     <Route element={<RequireAuth />}>
       <Route element={<AppLayout />}>
         {NAV_ITEMS.map((item) => (
-          <Route key={item.path} path={item.path.slice(1)} element={<SectionPage />} />
+          <Route
+            key={item.path}
+            path={item.path.slice(1)}
+            element={item.path === '/audits' ? <AuditsPage /> : <SectionPage />}
+          />
         ))}
       </Route>
     </Route>
