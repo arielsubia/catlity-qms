@@ -120,7 +120,7 @@ The backend uses a multi-tenant architecture with `tenant_id` on all tables:
 - **Tenant** — Organization using the platform
 - **User** — Team member linked to a tenant (roles: admin, lead_auditor, auditor, auditee, qa_manager)
 - **Audit** — Audit session with state machine (planned → in_progress → completed → closed). Each transition stores `status_changed_at`. See `docs/diagrams/audit-state-machine.png`.
-- **Finding** — Non-conformity or observation (types: major_nc, minor_nc, observation, improvement_opportunity)
+- **Finding** — Non-conformity or observation (types: major_nc, minor_nc, observation, improvement_opportunity). Lifecycle: open → in_progress → resolved → verified → closed, with a rejection from resolved back to in_progress. Each transition stores `status_changed_at`. See `docs/diagrams/finding-lifecycle.png`.
 - **CorrectiveAction** — Action plan for a finding
 - **Checklist / ChecklistItem** — Audit template questions
 - **Evidence** — Documents/photos uploaded to S3
@@ -158,10 +158,13 @@ Relevant endpoints:
 | `GET`  | `/api/v1/audits/{audit_id}/findings` | List findings of that audit. Query: `skip`, `limit` |
 | `GET`  | `/api/v1/findings` | List the tenant's findings. Query: `skip`, `limit`, optional `finding_type`, `audit_id`, and `status` |
 | `PATCH` | `/api/v1/findings/{finding_id}` | Update title, description, type, severity, or clause reference. Status, assignee, and the parent audit stay unchanged. A `qa_manager` or `auditee` cannot edit |
+| `PATCH` | `/api/v1/findings/{finding_id}/status` | Move one allowed step. The assigned auditee, or an admin, moves `open` → `in_progress` → `resolved`. An `auditor`, `lead_auditor`, or admin verifies (`resolved` → `verified`), rejects (`resolved` → `in_progress`), or closes (`verified` → `closed`). Invalid transitions return 422 and each change stores `status_changed_at` |
 
 Audit rows stay in PostgreSQL. In local development that database is the Docker Compose Postgres service, not Amazon RDS. These routes do not call AWS on each request and do not add IAM permissions. They read `custom:tenant_id` and `custom:role` from the Cognito JWT the API already validates. There is no delete route and no `lead_auditor_id` column. The executing auditor is `auditor_id`, which already existed. The `lead_auditor` role is a new group in the existing Cognito module. Applying that group updates User Pool `us-east-1_oa6gNvB4B` only, with `terraform apply -target=module.cognito`. A Cognito group has no monthly charge. VPC, NAT Gateway, and RDS remain unapplied, so this change stays at **$0/month**. Check the API with `pytest tests/test_audits.py tests/test_audit_status.py tests/test_audit_assignment.py -v` from `backend/`. A passing run does not require `terraform apply`.
 
-Finding rows use the `findings` table that already exists in that same schema. The finding routes add no AWS resource and no IAM permission, and they do not change User Pool `us-east-1_oa6gNvB4B`. A stored `status` can be filtered, and this API does not move it: the row stays `open` until a later lifecycle change. Assignee and corrective-action routes are not part of this API. VPC, NAT Gateway, and RDS stay unapplied, so the cost remains **$0/month**. Check it with `pytest tests/test_findings.py -v` from `backend/`. That run uses in-memory SQLite and does not need Docker or `terraform apply`.
+Finding rows use the `findings` table that already exists in that same schema. Create, list, and descriptive update add no AWS resource and no IAM permission, and they do not change User Pool `us-east-1_oa6gNvB4B`. Assignee and corrective-action routes are not part of this API. Check those routes with `pytest tests/test_findings.py -v` from `backend/`.
+
+Status changes are a separate route. Migration `003` adds nullable `status_changed_at` on `findings`, the same kind of column audits already store. That migration is not applied to Amazon RDS. The route still reads `custom:tenant_id` and `custom:role` from the Cognito JWT the API already validates. VPC, NAT Gateway, and RDS stay unapplied, so findings stay at **$0/month**. The dev User Pool remains `us-east-1_oa6gNvB4B`. Check the lifecycle with `pytest tests/test_finding_status.py -v` from `backend/`. That run uses in-memory SQLite and does not need Docker or `terraform apply`. See `docs/diagrams/finding-lifecycle.png`.
 
 Required environment variables (see `backend/.env.example`):
 

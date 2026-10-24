@@ -9,6 +9,13 @@ FindingType = Literal[
     "observation",
     "improvement_opportunity",
 ]
+FindingStatus = Literal[
+    "open",
+    "in_progress",
+    "resolved",
+    "verified",
+    "closed",
+]
 
 
 class FindingCreate(BaseModel):
@@ -47,6 +54,12 @@ class FindingUpdate(BaseModel):
         return value
 
 
+class FindingStatusUpdate(BaseModel):
+    """Target status for one allowed finding transition."""
+
+    status: FindingStatus
+
+
 class FindingResponse(BaseModel):
     """Finding returned to the client."""
 
@@ -60,6 +73,7 @@ class FindingResponse(BaseModel):
     finding_type: str
     severity: str
     status: str
+    status_changed_at: datetime | None
     clause_reference: str | None
     assignee_id: str | None
     created_at: datetime

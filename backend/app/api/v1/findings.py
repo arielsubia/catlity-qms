@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -8,10 +9,12 @@ from app.core.database import get_db
 from app.core.security import CurrentUser, get_current_user, require_role
 from app.models.audit import Audit
 from app.models.finding import Finding
+from app.models.user import User
 from app.schemas.finding import (
     FindingCreate,
     FindingListResponse,
     FindingResponse,
+    FindingStatusUpdate,
     FindingType,
     FindingUpdate,
 )
@@ -20,6 +23,62 @@ router = APIRouter(tags=["findings"])
 
 # The QA manager and the auditee consult findings and do not record them.
 FINDING_EDITOR_ROLES = ["auditor", "admin", "lead_auditor"]
+# One forward step while the assigned auditee is still correcting the finding.
+WORK_NEXT = {
+    "open": "in_progress",
+    "in_progress": "resolved",
+}
+# Verification, rejection, and closing. Rejection returns the finding to work.
+VERIFY_NEXT = {
+    "resolved": frozenset({"verified", "in_progress"}),
+    "verified": frozenset({"closed"}),
+}
+ADMIN_ROLES = frozenset({"admin"})
+VERIFIER_ROLES = frozenset({"auditor", "lead_auditor", "admin"})
+
+
+def _utcnow() -> datetime:
+    return datetime.now(UTC)
+
+
+def _holds_role(current_user: CurrentUser, roles: frozenset[str]) -> bool:
+    """True when the token role or a Cognito group matches one of ``roles``."""
+    held = {current_user.role, *current_user.groups}
+    return not held.isdisjoint(roles)
+
+
+def _is_assigned_auditee(db: Session, current_user: CurrentUser, finding: Finding) -> bool:
+    """True when the caller is the active auditee stored on the finding."""
+    if not current_user.sub or not finding.assignee_id:
+        return False
+    assignee = (
+        db.query(User)
+        .filter(
+            User.id == finding.assignee_id,
+            User.cognito_sub == current_user.sub,
+            User.tenant_id == current_user.tenant_id,
+            User.role == "auditee",
+            User.is_active.is_(True),
+        )
+        .first()
+    )
+    return assignee is not None
+
+
+def _allowed_status_targets(
+    db: Session, current_user: CurrentUser, finding: Finding
+) -> set[str]:
+    """Return the statuses this caller may store from the finding's current one."""
+    allowed: set[str] = set()
+    if _holds_role(current_user, ADMIN_ROLES) or _is_assigned_auditee(
+        db, current_user, finding
+    ):
+        step = WORK_NEXT.get(finding.status)
+        if step:
+            allowed.add(step)
+    if _holds_role(current_user, VERIFIER_ROLES):
+        allowed.update(VERIFY_NEXT.get(finding.status, ()))
+    return allowed
 
 
 def _get_tenant_audit(db: Session, audit_id: str, tenant_id: str) -> Audit:
@@ -162,6 +221,42 @@ def update_finding(
     update_data = finding_in.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(finding, field, value)
+    db.commit()
+    db.refresh(finding)
+    return finding
+
+
+@router.patch("/findings/{finding_id}/status", response_model=FindingResponse)
+def update_finding_status(
+    finding_id: str,
+    status_in: FindingStatusUpdate,
+    current_user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Finding:
+    """Move a finding one allowed step and record the transition time.
+
+    The assigned auditee, or a tenant admin, moves ``open`` to
+    ``in_progress`` and ``in_progress`` to ``resolved``. An auditor, a
+    lead auditor, or an admin moves ``resolved`` to ``verified``, rejects
+    ``resolved`` back to ``in_progress``, or moves ``verified`` to
+    ``closed``. Any other change returns 422.
+    """
+    finding = _get_tenant_finding(db, finding_id, current_user.tenant_id)
+    allowed = _allowed_status_targets(db, current_user, finding)
+    if status_in.status not in allowed:
+        if allowed or _holds_role(current_user, ADMIN_ROLES):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    f"Cannot change status from {finding.status} to {status_in.status}"
+                ),
+            )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You cannot change this finding's status",
+        )
+    finding.status = status_in.status
+    finding.status_changed_at = _utcnow()
     db.commit()
     db.refresh(finding)
     return finding
