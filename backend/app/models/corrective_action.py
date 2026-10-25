@@ -32,6 +32,7 @@ class CorrectiveAction(Base, TimestampMixin):
     )
     due_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     completion_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    effectiveness: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     # Relationships
     finding: Mapped["Finding"] = relationship(back_populates="corrective_actions")  # noqa: F821
