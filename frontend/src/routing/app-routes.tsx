@@ -6,8 +6,19 @@ import { PublicLayout } from '../layout/public-layout'
 import { LoginPage } from '../pages/login-page'
 import { RegisterPage } from '../pages/register-page'
 import { AuditsPage } from '../pages/audits-page'
+import { FindingsPage } from '../pages/findings-page'
 import { SectionPage } from '../pages/section-page'
 import { GuestOnly, RequireAuth, SessionRedirect } from './guards'
+
+const pageFor = (path: string) => {
+  if (path === '/audits') {
+    return <AuditsPage />
+  }
+  if (path === '/findings') {
+    return <FindingsPage />
+  }
+  return <SectionPage />
+}
 
 export const AppRoutes = () => (
   <Routes>
@@ -20,11 +31,7 @@ export const AppRoutes = () => (
     <Route element={<RequireAuth />}>
       <Route element={<AppLayout />}>
         {NAV_ITEMS.map((item) => (
-          <Route
-            key={item.path}
-            path={item.path.slice(1)}
-            element={item.path === '/audits' ? <AuditsPage /> : <SectionPage />}
-          />
+          <Route key={item.path} path={item.path.slice(1)} element={pageFor(item.path)} />
         ))}
       </Route>
     </Route>

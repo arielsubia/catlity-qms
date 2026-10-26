@@ -19,6 +19,13 @@ vi.mock('../api/audits-api', () => ({
   updateAuditStatus: vi.fn(),
 }))
 
+vi.mock('../api/findings-api', () => ({
+  listFindings: vi.fn().mockResolvedValue({ items: [], total: 0, skip: 0, limit: 1 }),
+  createFinding: vi.fn(),
+  updateFinding: vi.fn(),
+  updateFindingStatus: vi.fn(),
+}))
+
 const signedInUser: SessionUser = {
   email: 'ana@acme.com',
   tenantId: 'tenant-acme',
@@ -79,7 +86,7 @@ describe('AppRoutes', () => {
   )
 
   it.each(
-    NAV_ITEMS.filter((item) => item.path !== '/audits').map(
+    NAV_ITEMS.filter((item) => item.path !== '/audits' && item.path !== '/findings').map(
       (item) => [item.path, item.label] as const,
     ),
   )('renders the %s placeholder for a signed-in user', (path, label) => {
@@ -93,6 +100,14 @@ describe('AppRoutes', () => {
     renderRoutes('/audits', signedInUser)
 
     expect(await screen.findByRole('heading', { level: 2, name: 'Audits' })).toBeInTheDocument()
+    expect(screen.queryByText('This section is not available yet.')).not.toBeInTheDocument()
+  })
+
+  it('renders the findings screen for a signed-in user', async () => {
+    renderRoutes('/findings', signedInUser)
+
+    expect(await screen.findByRole('heading', { level: 2, name: 'Findings' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'New finding' })).toBeInTheDocument()
     expect(screen.queryByText('This section is not available yet.')).not.toBeInTheDocument()
   })
 
