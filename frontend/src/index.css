@@ -87,3 +87,13 @@ body {
 .audits-assign {
   margin-top: 16px;
 }
+
+.nav-item-label {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.app-body .ant-menu-item:has(.nav-findings-count) .ant-menu-title-content {
+  overflow: visible;
+}
