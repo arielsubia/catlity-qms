@@ -42,3 +42,28 @@ output "cognito_issuer_url" {
   description = "OpenID Connect issuer URL for JWT validation"
   value       = module.cognito.issuer_url
 }
+
+output "evidence_bucket_name" {
+  description = "Name of the evidence S3 bucket"
+  value       = module.evidence.bucket_name
+}
+
+output "evidence_bucket_arn" {
+  description = "ARN of the evidence S3 bucket"
+  value       = module.evidence.bucket_arn
+}
+
+output "evidence_table_name" {
+  description = "Name of the evidence DynamoDB table"
+  value       = module.evidence.table_name
+}
+
+output "evidence_table_arn" {
+  description = "ARN of the evidence DynamoDB table"
+  value       = module.evidence.table_arn
+}
+
+output "evidence_backend_task_role_arn" {
+  description = "ARN reserved for the future ECS task role that may access evidence"
+  value       = module.evidence.backend_task_role_arn
+}
