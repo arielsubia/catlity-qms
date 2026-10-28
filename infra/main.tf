@@ -39,3 +39,11 @@ module "cost" {
   alert_email           = var.budget_alert_email
   tags                  = local.common_tags
 }
+
+module "evidence" {
+  source = "./modules/evidence"
+
+  project_name = var.project_name
+  environment  = var.environment
+  tags         = local.common_tags
+}
