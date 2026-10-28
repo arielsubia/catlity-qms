@@ -164,6 +164,8 @@ Relevant endpoints:
 | `GET`  | `/api/v1/corrective-actions/{action_id}` | Return one action when it belongs to the token tenant |
 | `PATCH` | `/api/v1/corrective-actions/{action_id}` | Update description, due date, completion date, or effectiveness. Status, action type, responsible, and the parent finding stay unchanged |
 | `DELETE` | `/api/v1/corrective-actions/{action_id}` | Delete one action. The assigned auditee, or an admin, may delete it |
+| `POST` | `/api/v1/evidence/upload-url` | Sign a PUT to the evidence bucket. Any authenticated role of the tenant. PDF, PNG, JPG, and DOCX only, up to 25 MB. The URL expires in 15 minutes |
+| `POST` | `/api/v1/evidence/{evidence_id}/confirm` | After the PUT, check the object and mark its DynamoDB metadata `uploaded` |
 
 Audit rows stay in PostgreSQL. In local development that database is the Docker Compose Postgres service, not Amazon RDS. These routes do not call AWS on each request and do not add IAM permissions. They read `custom:tenant_id` and `custom:role` from the Cognito JWT the API already validates. There is no delete route and no `lead_auditor_id` column. The executing auditor is `auditor_id`, which already existed. The `lead_auditor` role is a new group in the existing Cognito module. Applying that group updates User Pool `us-east-1_oa6gNvB4B` only, with `terraform apply -target=module.cognito`. A Cognito group has no monthly charge. VPC, NAT Gateway, and RDS remain unapplied, so this change stays at **$0/month**. Check the API with `pytest tests/test_audits.py tests/test_audit_status.py tests/test_audit_assignment.py -v` from `backend/`. A passing run does not require `terraform apply`.
 
@@ -173,10 +175,14 @@ Status changes are a separate route. Migration `003` adds nullable `status_chang
 
 Corrective actions use the `corrective_actions` table that already points at `findings`. Migration `004` adds nullable `effectiveness` (`String(255)`) and is not applied to Amazon RDS. The routes add no AWS resource and no IAM permission. A finding can hold several actions. The assigned auditee, or an admin, creates, edits, and deletes them. Any authenticated role of the tenant can read them. VPC, NAT Gateway, and RDS stay unapplied, so this stays at **$0/month**. The dev User Pool remains `us-east-1_oa6gNvB4B`. Check it with `pytest tests/test_corrective_actions.py -v` from `backend/`. That run uses in-memory SQLite and does not need Docker or `terraform apply`.
 
+Evidence files go straight to the existing bucket `catlity-qms-dev-evidence`. `POST /api/v1/evidence/upload-url` signs the PUT locally for 15 minutes and includes `Content-Type`, `Content-Length`, and `x-amz-storage-class: INTELLIGENT_TIERING`. A pending row is written to the DynamoDB table `catlity-qms-dev-evidence`. `POST /api/v1/evidence/{evidence_id}/confirm` reads the object and sets that row to `uploaded`. The PostgreSQL `evidences` table is not used here. Signing the URL adds no AWS resource. The process credentials need `s3:PutObject` and `s3:GetObject` on the bucket, plus `dynamodb:PutItem`, `GetItem`, and `UpdateItem` on the table. A real PUT and one metadata write stay under $0.01. Tests mock those calls. Check them with `pytest tests/test_evidence.py -v` from `backend/`. That run does not need Docker or `terraform apply`.
+
 Required environment variables (see `backend/.env.example`):
 
 ```
 AWS_REGION=us-east-1
+EVIDENCE_BUCKET_NAME=catlity-qms-dev-evidence
+EVIDENCE_TABLE_NAME=catlity-qms-dev-evidence
 COGNITO_USER_POOL_ID=<pool id from terraform output>
 COGNITO_APP_CLIENT_ID=<app client id from terraform output>
 ```
