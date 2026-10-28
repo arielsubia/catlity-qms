@@ -13,6 +13,8 @@ class Settings(BaseSettings):
 
     # AWS
     aws_region: str = "us-east-1"
+    evidence_bucket_name: str = "catlity-qms-dev-evidence"
+    evidence_table_name: str = "catlity-qms-dev-evidence"
 
     # Cognito
     cognito_user_pool_id: str = ""
