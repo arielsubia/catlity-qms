@@ -1,0 +1,12 @@
+ISO 9001 study note: evaluation and improvement
+
+Study reference for the Catlity QMS normative agent.
+This note is an original summary of topics an auditor reviews. It is not the official text of ISO 9001 and it does not reproduce the standard.
+
+The organization decides what to measure, how, and when, so it can tell whether the system achieves the intended results. Customer satisfaction is one of those views. The method can be a survey, a complaint trend, a delivery record, or a conversation recorded in a way the auditor can see. Analysis and evaluation turn the numbers into a conclusion: which objective moved, which process is unstable, and what should change.
+
+Internal audit checks whether the system conforms to the organization's own requirements and is effectively implemented. The auditor of the certification body looks for a programme that covers the system over a planned period, auditors who are independent of the work they audit, and reports that state what was sampled and what was found. A finding without a follow-up is incomplete.
+
+Management review uses those results. Inputs include the status of actions from earlier reviews, changes in context, performance against objectives, customer feedback, process performance, nonconformities, audit results, and the performance of external providers. Outputs are decisions on improvement opportunities and any need to change the system or its resources. The review is a record, not a slide that nobody kept.
+
+When a requirement is not met, the organization reacts, deals with the consequence, and looks for the cause so the same failure is less likely. Corrective action is proportionate. The auditor asks for one closed case and for the evidence that the action was effective, not only that a task was marked done. Improvement also includes acting on a result that already meets the requirement when the organization sees a better way.

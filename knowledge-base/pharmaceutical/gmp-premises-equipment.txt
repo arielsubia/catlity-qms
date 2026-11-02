@@ -1,0 +1,14 @@
+GMP study note: premises and equipment
+
+Study reference for the Catlity QMS normative agent.
+This note is an original summary of topics an auditor reviews. It is not the official text of a GMP regulation and it does not reproduce a government code.
+
+Premises are arranged so that mix-ups and contamination are harder. The auditor walks the flow of materials and the flow of people. Incoming materials, sampling, processing, packaging, and finished goods should not cross in a way that confuses status. Walls, floors, and ceilings are cleanable. Temperature, humidity, and air quality are defined where the product needs them, and the records show the defined condition was held.
+
+Status of rooms and of equipment is visible. A label or an equivalent signal tells a person whether a line is cleaned, in use, or out of service. The auditor compares the label with the logbook. A clean label on equipment that still holds the previous product is a serious gap.
+
+Equipment that affects product quality is identified and maintained. Qualification, in plain terms, is the evidence that the equipment was installed as specified, operates as specified, and performs for the process that uses it. The auditor does not expect this note to replace a protocol. The auditor asks which equipment is in the programme, whether the current use matches the qualified range, and what happens after a repair that could change performance.
+
+Cleaning prevents the previous product, the detergent, and microbes from carrying into the next batch. The method, the tools, and the acceptance result are defined. A cleaning record names the previous product and the next product. Utensils and hoses are stored in a way that keeps them clean.
+
+Utilities such as water, gases, and compressed air are suitable for the way they touch the product. The auditor follows one utility from the point of generation to the point of use and looks for the monitoring the organization defined.

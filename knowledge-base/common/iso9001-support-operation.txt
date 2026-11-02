@@ -1,0 +1,12 @@
+ISO 9001 study note: support and operation
+
+Study reference for the Catlity QMS normative agent.
+This note is an original summary of topics an auditor reviews. It is not the official text of ISO 9001 and it does not reproduce the standard.
+
+Support is the set of conditions that let the work be done as planned. The auditor looks for people who are competent for the tasks that affect quality, with evidence of education, training, or experience, and for awareness of the quality policy and of what happens if requirements are not met. Infrastructure and the environment for the operation of processes have to suit the product or service. Monitoring and measuring resources are fit for purpose and, where the result matters, are checked against a reference.
+
+Documented information is controlled. The auditor asks which documents tell people how to work, who can change them, and how an obsolete copy is kept from being used. Records that show the work was done are identifiable, legible, and retained for the period the organization defined.
+
+Operation starts from requirements. The organization determines customer and applicable requirements, reviews them before committing, and keeps the result of that review. Design and development, when they are part of the system, follow planned stages with inputs, controls, outputs, and changes. External providers are selected and monitored; the auditor follows one purchased item or service back to the criteria used to approve the provider.
+
+Production or service provision runs under controlled conditions: documented information where its absence would create a risk, suitable monitoring, and a way to identify outputs. Release happens only when planned arrangements are complete, unless an authorized person approves the exception. Outputs that do not conform are identified and controlled so they are not used or delivered by mistake. The auditor samples one nonconforming case and checks the decision and the authority of the person who took it.

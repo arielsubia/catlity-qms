@@ -1,0 +1,14 @@
+GMP study note: quality control and deviations
+
+Study reference for the Catlity QMS normative agent.
+This note is an original summary of topics an auditor reviews. It is not the official text of a GMP regulation and it does not reproduce a government code.
+
+Quality control checks that materials and products meet the specifications the organization approved. Sampling follows a written method: where to take the sample, how much, how to protect it from mix-up, and how to label it so it still points to the container it came from. The auditor watches one sampling activity or reconstructs it from the record.
+
+Testing uses methods that are suitable for the decision being made. Reagents and reference materials are identified and within their defined use period. Results are recorded with the raw data needed to reconstruct the calculation. A summary without the underlying reading is not enough when the specification decision depends on that reading.
+
+A result that falls outside the specification starts a defined path. The batch or the material is held. Someone independent of the original tester reviews the investigation. The investigation considers the sample, the method, the equipment, and the process, and it ends in a documented decision. Repeating the test until a passing result appears, without that investigation, is a finding.
+
+Release of a finished batch is a decision by the quality function the organization named, after the batch record and the test results have been reviewed. Production output alone does not release the batch. Rejected material is identified and kept from being used.
+
+Deviations and complaints follow the same habit: describe what happened, assess the product impact, decide the action, and check that the action worked. The auditor selects one deviation that affected a batch and one that did not, and compares the depth of the investigation with the impact.
