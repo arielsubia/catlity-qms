@@ -50,6 +50,9 @@ class Finding(Base, TimestampMixin):
         back_populates="finding"
     )
     evidences: Mapped[list["Evidence"]] = relationship(back_populates="finding")  # noqa: F821
+    finding_evidences: Mapped[list["FindingEvidence"]] = relationship(  # noqa: F821
+        back_populates="finding"
+    )
 
     def __repr__(self) -> str:
         return f"<Finding(id={self.id}, type={self.finding_type}, status={self.status})>"
