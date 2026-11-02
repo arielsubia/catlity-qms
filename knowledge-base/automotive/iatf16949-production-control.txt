@@ -1,0 +1,14 @@
+IATF 16949 study note: production control
+
+Study reference for the Catlity QMS normative agent.
+This note is an original summary of topics an auditor reviews. It is not the official text of IATF 16949 and it does not reproduce the standard.
+
+Manufacturing control in an automotive supplier links the process flow, the risk analysis, and the control plan. The auditor expects those three views to describe the same process. A control step that exists only on the plan and not at the station, or a special characteristic that the risk analysis marks and the control plan never checks, is a break in the link.
+
+Work instructions at the station tell the person what to do, what to check, and what to do when the check fails. The reaction plan is part of the control, not a poster in the quality office. The auditor asks an operator to walk through the last time a check was out of limit: who was called, whether the product was contained, and where that decision was recorded.
+
+Special characteristics, whether they come from the customer or from the organization's own analysis, are identified in the documents and on the shop floor in a way people recognize. Sample sizes and frequencies on the control plan match what the records show. A daily check with a monthly record is a finding.
+
+Control of changes covers tooling, process parameters, suppliers, and inspection methods. A temporary change has an owner and an end date. The auditor samples one change and looks for the approval, the updated documents, and the point at which normal control resumed.
+
+Product approval before regular delivery is a planned package of evidence agreed with the customer. This note does not replace that customer's submission rules. The auditor checks that the organization knows which approval is current and that production matches the approved process.

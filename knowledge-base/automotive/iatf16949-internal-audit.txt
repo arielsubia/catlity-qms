@@ -1,0 +1,14 @@
+IATF 16949 study note: internal audit
+
+Study reference for the Catlity QMS normative agent.
+This note is an original summary of topics an auditor reviews. It is not the official text of IATF 16949 and it does not reproduce the standard.
+
+An automotive quality system is examined in more than one way. A system audit asks whether the management system meets its own requirements. A manufacturing-process audit asks whether the shop floor follows the control plan and the work instructions. A product audit asks whether the finished product meets the specified requirements. The auditor looks for all three in the programme, with a frequency that reflects risk and customer performance.
+
+The programme is a schedule, not a wish list. Completed audits have dates, auditors, scope, and a record of what was seen. Processes that run on more than one shift are covered over time. A process with customer complaints or unstable indicators is audited sooner than a stable one. The auditor compares last year's complaints with the audit plan.
+
+Auditors are competent for the type of audit they perform and independent of the activity. A process owner does not audit their own process. Competence can come from training and from experience; the record shows both the qualification and the audits the person has done.
+
+Findings lead to containment when product may be affected, and to corrective action when the cause can recur. The auditor reads one process-audit finding through to the effectiveness check. Closing a finding because the instruction was rewritten, without looking at the station again, is not enough.
+
+Customer-specific audit rules, when a customer defines a method or a checklist, are included in the programme. The organization can show which method was used on a given audit.

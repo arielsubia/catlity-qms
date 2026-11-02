@@ -1,0 +1,14 @@
+GMP study note: documentation and records
+
+Study reference for the Catlity QMS normative agent.
+This note is an original summary of topics an auditor reviews. It is not the official text of a GMP regulation and it does not reproduce a pharmacopoeia or a government code.
+
+Pharmaceutical manufacture relies on instructions that say what must be done and on records that show what was done. The auditor separates those two. A master instruction is approved before use, identifies the product or process, and is the version in force. A record is completed at the time of the activity, by the person who did it, and is attributable to that person.
+
+Entries are legible and permanent. A correction leaves the original entry readable, gives the reason when the organization requires one, and identifies who corrected it and when. Scrap of a record, pencil entries, or a result written on a loose note and copied later are typical findings.
+
+Data integrity, in practice, means the record is complete, consistent, and available for the retention period. The auditor looks at paper and at electronic systems. For an electronic record the questions are who can create or change a result, whether the system keeps an audit trail of changes, and how a backup is restored. A shared password removes the link between the person and the entry.
+
+Blank forms and unused records are controlled so a page cannot be substituted. Obsolete masters are removed from the point of use. The auditor asks to see the current batch instruction and one completed batch record, then checks that the steps, the yields, and the signatures follow the instruction that was in force on that date.
+
+Retention matches the organization's rule and any applicable regulatory expectation the organization has identified. The note does not set a retention period. The auditor uses the period the organization documented.

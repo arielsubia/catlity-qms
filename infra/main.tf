@@ -47,3 +47,11 @@ module "evidence" {
   environment  = var.environment
   tags         = local.common_tags
 }
+
+module "knowledge_base" {
+  source = "./modules/knowledge_base"
+
+  project_name = var.project_name
+  environment  = var.environment
+  tags         = local.common_tags
+}

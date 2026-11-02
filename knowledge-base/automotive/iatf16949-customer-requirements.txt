@@ -1,0 +1,14 @@
+IATF 16949 study note: customer-specific requirements
+
+Study reference for the Catlity QMS normative agent.
+This note is an original summary of topics an auditor reviews. It is not the official text of IATF 16949 and it does not reproduce the standard.
+
+Automotive customers add their own quality requirements on top of the shared management-system requirements. Those customer-specific requirements can cover submission levels, special characteristics, labeling, change notice, and how a supplier reports a problem. The auditor treats them as requirements of the system, not as a commercial appendix that quality can ignore.
+
+The organization needs a way to identify which customer-specific requirements apply to each customer and site. A matrix or an equivalent list is useful when it points to the process that implements each requirement. The auditor picks one customer and follows one requirement into a procedure, a control plan, or a record. A requirement that appears only in a contract folder and nowhere in the process is a gap.
+
+Changes to a customer-specific requirement are distributed to the people who must apply them. The auditor asks what happened the last time a customer updated a portal manual or a supplier requirement: who reviewed it, what changed in the plant, and how obsolete instructions were removed.
+
+Awareness matters on the line. A team leader should be able to name the customer requirement that changes how their process works, for example a label layout or a reaction when a special characteristic drifts. The quality function does not hold that knowledge alone.
+
+This note does not list a particular customer's manual. The agent should treat a named customer requirement as something to look up in the organization's own records, not as text stored here.

@@ -1,0 +1,12 @@
+ISO 9001 study note: context and leadership
+
+Study reference for the Catlity QMS normative agent.
+This note is an original summary of topics an auditor reviews. It is not the official text of ISO 9001 and it does not reproduce the standard.
+
+An organization explains why its quality management system exists before it describes procedures. The auditor looks for a scope that names the products and services covered, the sites included, and any requirement the organization chose not to apply, together with the reason. The scope has to match what the organization actually sells and where the work happens.
+
+Context means the internal and external issues that can affect the ability to deliver a conforming product or service. Typical evidence is a short record of those issues and of the interested parties whose needs the system addresses: customers, regulators, owners, and people doing the work. The auditor checks that the list is specific to the organization and that someone reviews it when the business changes.
+
+Leadership shows up in a quality policy that is appropriate to the purpose of the organization, gives a frame for objectives, and includes a commitment to satisfy applicable requirements and to improve the system. The policy is available as documented information and people can describe it in their own words. Roles that affect quality are assigned, including who reports on system performance. The auditor samples a process owner and asks what decision they can take and what result they are accountable for.
+
+A weak system often has a generic policy, a scope copied from another company, or responsibilities that exist only on an organization chart. The auditor treats those as gaps in direction, not as missing forms.

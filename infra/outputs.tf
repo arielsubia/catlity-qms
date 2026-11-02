@@ -67,3 +67,23 @@ output "evidence_backend_task_role_arn" {
   description = "ARN reserved for the future ECS task role that may access evidence"
   value       = module.evidence.backend_task_role_arn
 }
+
+output "knowledge_base_bucket_name" {
+  description = "Name of the normative knowledge base S3 bucket"
+  value       = module.knowledge_base.bucket_name
+}
+
+output "knowledge_base_bucket_arn" {
+  description = "ARN of the normative knowledge base S3 bucket"
+  value       = module.knowledge_base.bucket_arn
+}
+
+output "knowledge_base_prefixes" {
+  description = "S3 prefixes that hold the normative reference documents"
+  value       = module.knowledge_base.prefixes
+}
+
+output "knowledge_base_bedrock_role_arn" {
+  description = "ARN reserved for the future Bedrock knowledge base role"
+  value       = module.knowledge_base.bedrock_kb_role_arn
+}
