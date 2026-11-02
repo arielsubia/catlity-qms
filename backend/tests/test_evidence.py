@@ -1,4 +1,4 @@
-"""Presigned evidence upload URLs and the DynamoDB confirm step."""
+"""Presigned evidence upload URLs, the confirm step, and download URLs."""
 
 from __future__ import annotations
 
@@ -53,14 +53,10 @@ def rsa_keypair() -> dict[str, Any]:
 
 
 @pytest.fixture(autouse=True)
-def configure_cognito(
-    rsa_keypair: dict[str, Any], monkeypatch: pytest.MonkeyPatch
-) -> None:
+def configure_cognito(rsa_keypair: dict[str, Any], monkeypatch: pytest.MonkeyPatch) -> None:
     """Point settings at a fake pool and preload the JWKS cache."""
     monkeypatch.setattr(settings, "cognito_user_pool_id", "us-east-1_test", raising=False)
-    monkeypatch.setattr(
-        settings, "cognito_app_client_id", "test-client-id", raising=False
-    )
+    monkeypatch.setattr(settings, "cognito_app_client_id", "test-client-id", raising=False)
     monkeypatch.setattr(settings, "aws_region", "us-east-1", raising=False)
     kid = rsa_keypair["public_jwk"]["kid"]
     security._jwks_cache._keys = {kid: rsa_keypair["public_jwk"]}
@@ -101,6 +97,7 @@ class MemoryStore:
         self.items: dict[tuple[str, str], dict[str, Any]] = {}
         self.objects: dict[str, ObjectHead] = {}
         self.signed: list[dict[str, Any]] = []
+        self.downloads: list[str] = []
 
     def put_pending(self, item: dict[str, Any]) -> None:
         self.items[(item["tenant_id"], item["evidence_id"])] = dict(item)
@@ -109,19 +106,19 @@ class MemoryStore:
         item = self.items.get((tenant_id, evidence_id))
         return None if item is None else dict(item)
 
-    def mark_uploaded(
-        self, tenant_id: str, evidence_id: str, uploaded_at: str
-    ) -> dict[str, Any]:
+    def mark_uploaded(self, tenant_id: str, evidence_id: str, uploaded_at: str) -> dict[str, Any]:
         item = self.items[(tenant_id, evidence_id)]
         item["status"] = "uploaded"
         item["uploaded_at"] = uploaded_at
         return dict(item)
 
     def presign_put(self, *, key: str, content_type: str, file_size: int) -> str:
-        self.signed.append(
-            {"key": key, "content_type": content_type, "file_size": file_size}
-        )
+        self.signed.append({"key": key, "content_type": content_type, "file_size": file_size})
         return f"https://signed.example/{key}"
+
+    def presign_get(self, *, key: str) -> str:
+        self.downloads.append(key)
+        return f"https://download.example/{key}"
 
     def head(self, key: str) -> ObjectHead | None:
         return self.objects.get(key)
@@ -357,6 +354,109 @@ def test_presign_requests_a_15_minute_intelligent_tiering_put() -> None:
                 "ContentType": PDF,
                 "ContentLength": 40,
                 "StorageClass": STORAGE_CLASS,
+            },
+            "ExpiresIn": UPLOAD_EXPIRES_IN,
+        }
+    ]
+
+
+def test_download_url_signs_a_get_for_an_uploaded_object(
+    client: TestClient, rsa_keypair: dict[str, Any], store: MemoryStore
+) -> None:
+    token = _token(rsa_keypair)
+    created = client.post(
+        "/api/v1/evidence/upload-url",
+        headers=_auth(token),
+        json={"file_name": "note.pdf", "content_type": PDF, "file_size": 20},
+    )
+    body = created.json()
+    store.items[("tenant-001", body["evidence_id"])]["status"] = "uploaded"
+
+    response = client.get(
+        f"/api/v1/evidence/{body['evidence_id']}/download-url",
+        headers=_auth(token),
+    )
+
+    assert response.status_code == 200
+    downloaded = response.json()
+    assert downloaded["download_url"] == f"https://download.example/{body['s3_key']}"
+    assert downloaded["expires_in"] == UPLOAD_EXPIRES_IN
+    assert downloaded["file_name"] == "note.pdf"
+    assert downloaded["content_type"] == PDF
+    assert store.downloads == [body["s3_key"]]
+
+
+def test_download_url_rejects_a_pending_upload(
+    client: TestClient, rsa_keypair: dict[str, Any], store: MemoryStore
+) -> None:
+    token = _token(rsa_keypair)
+    created = client.post(
+        "/api/v1/evidence/upload-url",
+        headers=_auth(token),
+        json={"file_name": "note.pdf", "content_type": PDF, "file_size": 20},
+    )
+    response = client.get(
+        f"/api/v1/evidence/{created.json()['evidence_id']}/download-url",
+        headers=_auth(token),
+    )
+    assert response.status_code == 422
+    assert store.downloads == []
+
+
+def test_download_url_hides_a_missing_or_foreign_object(
+    client: TestClient, rsa_keypair: dict[str, Any], store: MemoryStore
+) -> None:
+    owner = _token(rsa_keypair, tenant_id="tenant-a")
+    other = _token(rsa_keypair, tenant_id="tenant-b")
+    created = client.post(
+        "/api/v1/evidence/upload-url",
+        headers=_auth(owner),
+        json={"file_name": "note.pdf", "content_type": PDF, "file_size": 20},
+    )
+    evidence_id = created.json()["evidence_id"]
+    store.items[("tenant-a", evidence_id)]["status"] = "uploaded"
+
+    missing = client.get(
+        "/api/v1/evidence/does-not-exist/download-url",
+        headers=_auth(owner),
+    )
+    foreign = client.get(
+        f"/api/v1/evidence/{evidence_id}/download-url",
+        headers=_auth(other),
+    )
+    anonymous = client.get(f"/api/v1/evidence/{evidence_id}/download-url")
+
+    assert missing.status_code == 404
+    assert foreign.status_code == 404
+    assert anonymous.status_code == 401
+    assert store.downloads == []
+
+
+def test_presign_requests_a_15_minute_get() -> None:
+    class RecordingS3:
+        def __init__(self) -> None:
+            self.calls: list[dict[str, Any]] = []
+
+        def generate_presigned_url(self, operation: str, **kwargs: Any) -> str:
+            self.calls.append({"operation": operation, **kwargs})
+            return "https://bucket.example/download"
+
+    s3 = RecordingS3()
+    store = BotoEvidenceStore(
+        bucket="catlity-qms-dev-evidence",
+        table="catlity-qms-dev-evidence",
+        region="us-east-1",
+        s3_client=s3,
+        dynamodb_client=object(),
+    )
+    url = store.presign_get(key="tenant/id/note.pdf")
+    assert url == "https://bucket.example/download"
+    assert s3.calls == [
+        {
+            "operation": "get_object",
+            "Params": {
+                "Bucket": "catlity-qms-dev-evidence",
+                "Key": "tenant/id/note.pdf",
             },
             "ExpiresIn": UPLOAD_EXPIRES_IN,
         }

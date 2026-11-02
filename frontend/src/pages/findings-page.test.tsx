@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { listAudits, type Audit } from '../api/audits-api'
+import { listFindingEvidence } from '../api/evidence-api'
 import {
   createFinding,
   listFindings,
@@ -18,6 +19,16 @@ import { FindingsPage } from './findings-page'
 vi.mock('../api/audits-api', () => ({
   listAudits: vi.fn(),
 }))
+
+vi.mock('../api/evidence-api', async () => {
+  const actual = await vi.importActual<typeof import('../api/evidence-api')>('../api/evidence-api')
+  return {
+    ...actual,
+    listFindingEvidence: vi.fn(),
+    uploadAndLink: vi.fn(),
+    requestDownloadUrl: vi.fn(),
+  }
+})
 
 vi.mock('../api/findings-api', () => ({
   listFindings: vi.fn(),
@@ -94,6 +105,7 @@ describe('FindingsPage', () => {
     vi.mocked(createFinding).mockReset()
     vi.mocked(updateFinding).mockReset()
     vi.mocked(updateFindingStatus).mockReset()
+    vi.mocked(listFindingEvidence).mockResolvedValue({ items: [] })
     vi.mocked(listAudits).mockResolvedValue({
       items: [audit()],
       total: 1,
