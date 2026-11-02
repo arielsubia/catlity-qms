@@ -13,6 +13,7 @@ import {
   typeLabel,
 } from '../findings/finding-view'
 import { canEditFinding } from '../findings/permissions'
+import { FindingEvidencePanel } from './finding-evidence-panel'
 
 interface FindingDetailDrawerProps {
   finding: Finding
@@ -84,6 +85,7 @@ export const FindingDetailDrawer = ({
         {assigneeLabel(finding.assignee_id)}
       </Typography.Paragraph>
       <Typography.Paragraph>{finding.description ?? 'No description.'}</Typography.Paragraph>
+      <FindingEvidencePanel key={finding.id} findingId={finding.id} />
       {actionError && <Alert type="error" showIcon className="auth-alert" title={actionError} />}
       {showActions && (
         <Space wrap>

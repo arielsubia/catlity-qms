@@ -1,13 +1,19 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.core.security import CurrentUser, get_current_user
-from app.schemas.evidence import EvidenceMetadata, UploadUrlRequest, UploadUrlResponse
+from app.schemas.evidence import (
+    DownloadUrlResponse,
+    EvidenceMetadata,
+    UploadUrlRequest,
+    UploadUrlResponse,
+)
 from app.services.evidence import (
     EvidenceNotFound,
     EvidenceNotUploaded,
     EvidenceObjectMismatch,
     InvalidEvidenceFile,
     confirm_upload,
+    create_download_url,
     create_upload_url,
     get_store,
 )
@@ -70,3 +76,31 @@ def confirm_evidence_upload(
             detail=str(exc),
         ) from exc
     return EvidenceMetadata.model_validate(item)
+
+
+@router.get("/{evidence_id}/download-url", response_model=DownloadUrlResponse)
+def request_download_url(
+    evidence_id: str,
+    current_user: CurrentUser = Depends(get_current_user),
+) -> DownloadUrlResponse:
+    """Sign a 15-minute GET for an uploaded object of the caller's tenant."""
+    try:
+        ticket = create_download_url(
+            get_store(),
+            tenant_id=current_user.tenant_id,
+            evidence_id=evidence_id,
+        )
+    except EvidenceNotFound as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except EvidenceNotUploaded as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+    return DownloadUrlResponse(
+        evidence_id=ticket.evidence_id,
+        download_url=ticket.download_url,
+        expires_in=ticket.expires_in,
+        file_name=ticket.file_name,
+        content_type=ticket.content_type,
+    )

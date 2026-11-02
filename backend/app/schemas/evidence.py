@@ -21,6 +21,16 @@ class UploadUrlResponse(BaseModel):
     s3_key: str
 
 
+class DownloadUrlResponse(BaseModel):
+    """Presigned GET for one uploaded object of the caller's tenant."""
+
+    evidence_id: str
+    download_url: str
+    expires_in: int
+    file_name: str
+    content_type: str
+
+
 class EvidenceMetadata(BaseModel):
     """Evidence metadata stored in DynamoDB."""
 

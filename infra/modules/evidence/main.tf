@@ -162,6 +162,20 @@ resource "aws_s3_bucket_policy" "evidence" {
   ]
 }
 
+# The browser PUT sends Content-Type and x-amz-storage-class, so S3 must
+# answer the preflight. This is a setting on the existing bucket.
+resource "aws_s3_bucket_cors_configuration" "evidence" {
+  bucket = aws_s3_bucket.evidence.id
+
+  cors_rule {
+    allowed_headers = ["Content-Type", "Content-Length", "x-amz-storage-class"]
+    allowed_methods = ["PUT", "GET", "HEAD"]
+    allowed_origins = var.cors_allowed_origins
+    expose_headers  = ["ETag"]
+    max_age_seconds = 3000
+  }
+}
+
 # --- Evidence metadata ---
 
 resource "aws_dynamodb_table" "evidence" {

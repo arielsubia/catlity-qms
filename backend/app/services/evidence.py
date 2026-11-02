@@ -2,6 +2,7 @@
 
 The API signs the PUT locally. The file bytes go to S3 from the client.
 A confirm call checks the object and then marks the DynamoDB row uploaded.
+A download call signs a GET for a row that is already uploaded.
 """
 
 from __future__ import annotations
@@ -66,6 +67,17 @@ class UploadTicket:
     s3_key: str
 
 
+@dataclass(frozen=True)
+class DownloadTicket:
+    """What the client needs to download one uploaded object."""
+
+    evidence_id: str
+    download_url: str
+    expires_in: int
+    file_name: str
+    content_type: str
+
+
 class EvidenceStore(Protocol):
     """Persistence and S3 calls used by the upload flow."""
 
@@ -75,13 +87,14 @@ class EvidenceStore(Protocol):
     def get(self, tenant_id: str, evidence_id: str) -> dict[str, Any] | None:
         """Return the metadata row, or None when this tenant has no such id."""
 
-    def mark_uploaded(
-        self, tenant_id: str, evidence_id: str, uploaded_at: str
-    ) -> dict[str, Any]:
+    def mark_uploaded(self, tenant_id: str, evidence_id: str, uploaded_at: str) -> dict[str, Any]:
         """Set the row to uploaded and return it."""
 
     def presign_put(self, *, key: str, content_type: str, file_size: int) -> str:
         """Return a PUT URL that expires in 15 minutes."""
+
+    def presign_get(self, *, key: str) -> str:
+        """Return a GET URL that expires in 15 minutes."""
 
     def head(self, key: str) -> ObjectHead | None:
         """Return the object head, or None when the key is absent."""
@@ -124,9 +137,7 @@ class BotoEvidenceStore:
             return None
         return _from_item(raw)
 
-    def mark_uploaded(
-        self, tenant_id: str, evidence_id: str, uploaded_at: str
-    ) -> dict[str, Any]:
+    def mark_uploaded(self, tenant_id: str, evidence_id: str, uploaded_at: str) -> dict[str, Any]:
         response = self._dynamodb.update_item(
             TableName=self._table,
             Key={
@@ -155,6 +166,13 @@ class BotoEvidenceStore:
                 "ContentLength": file_size,
                 "StorageClass": STORAGE_CLASS,
             },
+            ExpiresIn=UPLOAD_EXPIRES_IN,
+        )
+
+    def presign_get(self, *, key: str) -> str:
+        return self._s3.generate_presigned_url(
+            "get_object",
+            Params={"Bucket": self._bucket, "Key": key},
             ExpiresIn=UPLOAD_EXPIRES_IN,
         )
 
@@ -200,9 +218,7 @@ def create_upload_url(
             "uploaded_at": None,
         }
     )
-    upload_url = store.presign_put(
-        key=s3_key, content_type=content_type, file_size=file_size
-    )
+    upload_url = store.presign_put(key=s3_key, content_type=content_type, file_size=file_size)
     return UploadTicket(
         evidence_id=evidence_id,
         upload_url=upload_url,
@@ -216,9 +232,7 @@ def create_upload_url(
     )
 
 
-def confirm_upload(
-    store: EvidenceStore, *, tenant_id: str, evidence_id: str
-) -> dict[str, Any]:
+def confirm_upload(store: EvidenceStore, *, tenant_id: str, evidence_id: str) -> dict[str, Any]:
     """Mark the row uploaded after the object is present and matches the signature."""
     item = store.get(tenant_id, evidence_id)
     if item is None:
@@ -230,10 +244,26 @@ def confirm_upload(
     if head is None:
         raise EvidenceNotUploaded("Object is not in the evidence bucket yet")
     if head.content_type != item["content_type"] or head.content_length != item["file_size"]:
-        raise EvidenceObjectMismatch(
-            "Uploaded object does not match the signed type or size"
-        )
+        raise EvidenceObjectMismatch("Uploaded object does not match the signed type or size")
     return store.mark_uploaded(tenant_id, evidence_id, datetime.now(UTC).isoformat())
+
+
+def create_download_url(
+    store: EvidenceStore, *, tenant_id: str, evidence_id: str
+) -> DownloadTicket:
+    """Sign a GET when this tenant already has the object marked uploaded."""
+    item = store.get(tenant_id, evidence_id)
+    if item is None:
+        raise EvidenceNotFound("Evidence not found")
+    if item["status"] != "uploaded":
+        raise EvidenceNotUploaded("Evidence is not uploaded yet")
+    return DownloadTicket(
+        evidence_id=evidence_id,
+        download_url=store.presign_get(key=item["s3_key"]),
+        expires_in=UPLOAD_EXPIRES_IN,
+        file_name=item["file_name"],
+        content_type=item["content_type"],
+    )
 
 
 def _clean_file_name(file_name: str) -> str:

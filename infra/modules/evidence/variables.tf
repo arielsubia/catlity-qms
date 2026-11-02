@@ -12,3 +12,9 @@ variable "tags" {
   description = "Common tags to apply to all resources"
   type        = map(string)
 }
+
+variable "cors_allowed_origins" {
+  description = "Browser origins allowed to upload evidence directly to the bucket"
+  type        = list(string)
+  default     = ["http://localhost:5173"]
+}
