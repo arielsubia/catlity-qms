@@ -37,6 +37,7 @@ node_modules/
 *.tfplan
 *.tfvars
 !*.tfvars.example
+infra/modules/bedrock/retrieve.zip
 
 # IDE
 .vscode/

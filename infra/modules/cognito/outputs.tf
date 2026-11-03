@@ -20,5 +20,5 @@ output "user_pool_domain" {
 
 output "issuer_url" {
   description = "OpenID Connect issuer URL used to validate JWTs"
-  value       = "https://cognito-idp.${data.aws_region.current.name}.amazonaws.com/${aws_cognito_user_pool.main.id}"
+  value       = "https://cognito-idp.${data.aws_region.current.region}.amazonaws.com/${aws_cognito_user_pool.main.id}"
 }

@@ -55,3 +55,13 @@ module "knowledge_base" {
   environment  = var.environment
   tags         = local.common_tags
 }
+
+module "bedrock" {
+  source = "./modules/bedrock"
+
+  project_name              = var.project_name
+  environment               = var.environment
+  aws_region                = var.aws_region
+  knowledge_base_bucket_arn = module.knowledge_base.bucket_arn
+  tags                      = local.common_tags
+}
