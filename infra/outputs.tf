@@ -84,6 +84,41 @@ output "knowledge_base_prefixes" {
 }
 
 output "knowledge_base_bedrock_role_arn" {
-  description = "ARN reserved for the future Bedrock knowledge base role"
-  value       = module.knowledge_base.bedrock_kb_role_arn
+  description = "ARN of the Bedrock knowledge base role created by module.bedrock"
+  value       = module.bedrock.kb_role_arn
+}
+
+output "bedrock_agent_role_arn" {
+  description = "ARN of the AgentCore harness execution role"
+  value       = module.bedrock.agent_role_arn
+}
+
+output "bedrock_gateway_id" {
+  description = "Id of the study-note retrieval gateway"
+  value       = module.bedrock.gateway_id
+}
+
+output "bedrock_vector_bucket_name" {
+  description = "Name of the S3 Vectors bucket"
+  value       = module.bedrock.vector_bucket_name
+}
+
+output "bedrock_knowledge_base_ids" {
+  description = "Bedrock knowledge base ids keyed by corpus"
+  value       = module.bedrock.knowledge_base_ids
+}
+
+output "bedrock_data_source_ids" {
+  description = "Bedrock data source ids keyed by corpus"
+  value       = module.bedrock.data_source_ids
+}
+
+output "bedrock_harness_id" {
+  description = "Id of the Normative Advisor harness"
+  value       = module.bedrock.harness_id
+}
+
+output "bedrock_harness_arn" {
+  description = "ARN of the Normative Advisor harness"
+  value       = module.bedrock.harness_arn
 }

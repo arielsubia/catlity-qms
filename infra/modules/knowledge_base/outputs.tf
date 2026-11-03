@@ -19,7 +19,7 @@ output "document_keys" {
 }
 
 output "bedrock_kb_role_arn" {
-  description = "ARN reserved for the future Bedrock knowledge base role. This module does not create the role."
+  description = "ARN of the Bedrock knowledge base role. module.bedrock creates the role with this name."
   value       = local.bedrock_kb_role_arn
 }
 
