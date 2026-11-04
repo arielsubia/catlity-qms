@@ -8,6 +8,7 @@ from app.api.v1.evidence import router as evidence_router
 from app.api.v1.finding_evidence import router as finding_evidence_router
 from app.api.v1.findings import router as findings_router
 from app.api.v1.health import router as health_router
+from app.api.v1.normative import router as normative_router
 from app.api.v1.tenants import router as tenants_router
 
 api_router = APIRouter(prefix="/api/v1")
@@ -20,3 +21,4 @@ api_router.include_router(findings_router)
 api_router.include_router(finding_evidence_router)
 api_router.include_router(corrective_actions_router)
 api_router.include_router(evidence_router)
+api_router.include_router(normative_router)
