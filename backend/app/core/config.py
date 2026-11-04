@@ -20,6 +20,15 @@ class Settings(BaseSettings):
     cognito_user_pool_id: str = ""
     cognito_app_client_id: str = ""
 
+    # Normative Advisor. These ids already exist in us-east-1.
+    normative_harness_arn: str = (
+        "arn:aws:bedrock-agentcore:us-east-1:265751834002:"
+        "harness/Normative_Advisor-CLJ73dVHYz"
+    )
+    normative_kb_common_id: str = "OTQJ8TMBNI"
+    normative_kb_automotive_id: str = "QWONN58E2H"
+    normative_kb_pharmaceutical_id: str = "DX3IVAFQ6K"
+
     @property
     def cognito_issuer(self) -> str:
         """OpenID Connect issuer URL for the configured user pool."""
