@@ -26,6 +26,10 @@ vi.mock('../api/findings-api', () => ({
   updateFindingStatus: vi.fn(),
 }))
 
+vi.mock('../api/normative-api', () => ({
+  queryNormative: vi.fn(),
+}))
+
 const signedInUser: SessionUser = {
   email: 'ana@acme.com',
   tenantId: 'tenant-acme',
@@ -86,9 +90,9 @@ describe('AppRoutes', () => {
   )
 
   it.each(
-    NAV_ITEMS.filter((item) => item.path !== '/audits' && item.path !== '/findings').map(
-      (item) => [item.path, item.label] as const,
-    ),
+    NAV_ITEMS.filter(
+      (item) => item.path !== '/audits' && item.path !== '/findings' && item.path !== '/ai-agent',
+    ).map((item) => [item.path, item.label] as const),
   )('renders the %s placeholder for a signed-in user', (path, label) => {
     renderRoutes(path, signedInUser)
 
@@ -100,6 +104,15 @@ describe('AppRoutes', () => {
     renderRoutes('/audits', signedInUser)
 
     expect(await screen.findByRole('heading', { level: 2, name: 'Audits' })).toBeInTheDocument()
+    expect(screen.queryByText('This section is not available yet.')).not.toBeInTheDocument()
+  })
+
+  it('renders the AI agent chat for a signed-in user', () => {
+    renderRoutes('/ai-agent', signedInUser)
+
+    expect(screen.getByRole('heading', { level: 2, name: 'AI Agent' })).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Question' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Send' })).toBeInTheDocument()
     expect(screen.queryByText('This section is not available yet.')).not.toBeInTheDocument()
   })
 
