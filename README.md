@@ -252,6 +252,14 @@ from the browser needs the CORS rule on `catlity-qms-dev-evidence` (origin
 `http://localhost:5173`). That rule is in `module.evidence` and is not applied
 yet. See `docs/diagrams/evidence-upload-flow.png`.
 
+The AI Agent screen at `/ai-agent` asks the normative advisor through the existing
+`POST /api/v1/ai/normative/query`. The body is `{ "question": "..." }` and the
+request carries the Cognito ID token. The thread stays on the page until reload
+or navigation. Each reference link opens the study-note file name, which the API
+returns as both `document` and `section`. Those notes stay in the private bucket
+`catlity-qms-dev-knowledge-base`. This screen adds no AWS resource and no IAM
+permission. Estimated cost stays **$0/month** while no question reaches the model.
+
 ### Infrastructure
 
 ```bash

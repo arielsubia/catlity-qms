@@ -5,6 +5,7 @@ import { NAV_ITEMS } from '../layout/nav-items'
 import { PublicLayout } from '../layout/public-layout'
 import { LoginPage } from '../pages/login-page'
 import { RegisterPage } from '../pages/register-page'
+import { AiAgentPage } from '../pages/ai-agent-page'
 import { AuditsPage } from '../pages/audits-page'
 import { FindingsPage } from '../pages/findings-page'
 import { SectionPage } from '../pages/section-page'
@@ -16,6 +17,9 @@ const pageFor = (path: string) => {
   }
   if (path === '/findings') {
     return <FindingsPage />
+  }
+  if (path === '/ai-agent') {
+    return <AiAgentPage />
   }
   return <SectionPage />
 }

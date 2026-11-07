@@ -130,3 +130,37 @@ body {
   min-width: 0;
   overflow-wrap: anywhere;
 }
+
+.ai-agent-messages {
+  margin-bottom: 16px;
+}
+
+.ai-agent-role {
+  display: block;
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+
+.ai-agent-answer {
+  margin-bottom: 0;
+}
+
+.ai-agent-references {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ai-agent-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: stretch;
+}
+
+.ai-agent-composer .ant-btn {
+  align-self: flex-start;
+}
