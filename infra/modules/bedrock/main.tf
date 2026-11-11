@@ -343,6 +343,20 @@ resource "aws_bedrockagent_data_source" "corpus" {
       inclusion_prefixes = [each.value.prefix]
     }
   }
+
+  # The default chunk is about 300 tokens. Each note is under 2 KB, so that
+  # text plus the filterable metadata Bedrock stores with the chunk exceeds
+  # the 2048-byte S3 Vectors limit and the ingestion job stores nothing.
+  vector_ingestion_configuration {
+    chunking_configuration {
+      chunking_strategy = "FIXED_SIZE"
+
+      fixed_size_chunking_configuration {
+        max_tokens         = 120
+        overlap_percentage = 20
+      }
+    }
+  }
 }
 
 # --- Retrieval ---
