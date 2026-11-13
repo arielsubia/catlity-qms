@@ -8,6 +8,14 @@ locals {
   embedding_dims        = 1024
   response_profile      = "us.amazon.nova-micro-v1:0"
   harness_name          = "Normative_Advisor"
+  report_harness_name   = "Report_Generator"
+  report_role_name      = "${var.project_name}-${var.environment}-bedrock-report"
+  report_profile        = "us.amazon.nova-micro-v1:0"
+  # Literal ARN so this harness does not depend on the normative gateway
+  # resource. A reference would pull the retrieve Lambda into the apply, and
+  # the local zip hash does not match the published function.
+  report_gateway_arn    = "arn:aws:bedrock-agentcore:${var.aws_region}:${data.aws_caller_identity.current.account_id}:gateway/catlity-qms-dev-normative-gociabb2cb"
+  report_instruction    = "You are Report Generator for Catlity QMS. Write an audit report from the findings in the user message. Use these four headings, in this order: Resumen, Hallazgos, Conclusiones, Recomendaciones. If the findings are written in Spanish, write the report in Spanish. If they are written in English, write the report in English. Cite the file name of each study note you use, exactly as it appears in the passage. Do not translate file names. The notes are original study summaries in English. They are not the official text of ISO 9001, IATF 16949, or GMP. Do not invent clause numbers or requirements. If no passage covers a finding, say so in that finding and do not fill the gap from general knowledge. A Spanish finding can miss an English note. Treat a missing passage as no citation."
   gateway_name          = "${var.project_name}-${var.environment}-normative"
   gateway_role_name     = "${var.project_name}-${var.environment}-bedrock-gateway"
   retrieve_role_name    = "${var.project_name}-${var.environment}-bedrock-retrieve"
@@ -593,4 +601,188 @@ resource "aws_bedrockagentcore_harness" "normative" {
     aws_iam_role_policy.agent,
     aws_bedrockagentcore_gateway_target.study_notes,
   ]
+}
+
+# --- Report Generator ---
+# Second harness. It reuses the study-note gateway and does not change
+# Normative_Advisor. Its model id is report_profile, not response_profile.
+
+resource "aws_iam_role" "report" {
+  name               = local.report_role_name
+  assume_role_policy = data.aws_iam_policy_document.agent_assume.json
+
+  tags = merge(var.tags, {
+    Name = local.report_role_name
+  })
+}
+
+data "aws_iam_policy_document" "report" {
+  statement {
+    sid    = "InvokeResponseModel"
+    effect = "Allow"
+    actions = [
+      "bedrock:InvokeModel",
+      "bedrock:InvokeModelWithResponseStream",
+    ]
+    resources = [
+      "arn:aws:bedrock:*::foundation-model/amazon.nova-micro-v1:0",
+      "arn:aws:bedrock:${var.aws_region}:${data.aws_caller_identity.current.account_id}:inference-profile/${local.report_profile}",
+    ]
+  }
+
+  statement {
+    sid       = "ReadInferenceProfile"
+    effect    = "Allow"
+    actions   = ["bedrock:GetInferenceProfile"]
+    resources = ["arn:aws:bedrock:${var.aws_region}:${data.aws_caller_identity.current.account_id}:inference-profile/${local.report_profile}"]
+  }
+
+  statement {
+    sid       = "InvokeStudyNotesGateway"
+    effect    = "Allow"
+    actions   = ["bedrock-agentcore:InvokeGateway"]
+    resources = [local.report_gateway_arn]
+  }
+
+  statement {
+    sid       = "PullManagedHarnessImage"
+    effect    = "Allow"
+    actions   = ["ecr-public:GetAuthorizationToken"]
+    resources = ["*"]
+  }
+
+  statement {
+    sid       = "BearerTokenForPublicEcr"
+    effect    = "Allow"
+    actions   = ["sts:GetServiceBearerToken"]
+    resources = ["*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "sts:AWSServiceName"
+      values   = ["ecr-public.amazonaws.com"]
+    }
+  }
+
+  statement {
+    sid    = "WriteHarnessLogs"
+    effect = "Allow"
+    actions = [
+      "logs:CreateLogGroup",
+      "logs:DescribeLogStreams",
+    ]
+    resources = ["arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/bedrock-agentcore/runtimes/*"]
+  }
+
+  statement {
+    sid       = "DescribeHarnessLogGroups"
+    effect    = "Allow"
+    actions   = ["logs:DescribeLogGroups"]
+    resources = ["arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:*"]
+  }
+
+  statement {
+    sid    = "WriteHarnessLogStreams"
+    effect = "Allow"
+    actions = [
+      "logs:CreateLogStream",
+      "logs:PutLogEvents",
+    ]
+    resources = ["arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/bedrock-agentcore/runtimes/*:log-stream:*"]
+  }
+
+  statement {
+    sid       = "AllowHarnessLogDelivery"
+    effect    = "Allow"
+    actions   = ["logs:PutResourcePolicy"]
+    resources = ["*"]
+  }
+
+  statement {
+    sid       = "PublishHarnessMetrics"
+    effect    = "Allow"
+    actions   = ["cloudwatch:PutMetricData"]
+    resources = ["*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "cloudwatch:namespace"
+      values   = ["bedrock-agentcore"]
+    }
+  }
+
+  statement {
+    sid    = "TraceHarnessSessions"
+    effect = "Allow"
+    actions = [
+      "xray:PutTraceSegments",
+      "xray:PutTelemetryRecords",
+      "xray:GetSamplingRules",
+      "xray:GetSamplingTargets",
+    ]
+    resources = ["*"]
+  }
+
+  statement {
+    sid    = "GetHarnessWorkloadToken"
+    effect = "Allow"
+    actions = [
+      "bedrock-agentcore:GetWorkloadAccessToken",
+      "bedrock-agentcore:GetWorkloadAccessTokenForJWT",
+    ]
+    resources = [
+      "arn:aws:bedrock-agentcore:${var.aws_region}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default",
+      "arn:aws:bedrock-agentcore:${var.aws_region}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default/workload-identity/harness_${local.report_harness_name}-*",
+    ]
+  }
+}
+
+resource "aws_iam_role_policy" "report" {
+  name   = "${local.report_role_name}-access"
+  role   = aws_iam_role.report.id
+  policy = data.aws_iam_policy_document.report.json
+}
+
+resource "aws_bedrockagentcore_harness" "report" {
+  harness_name       = local.report_harness_name
+  execution_role_arn = aws_iam_role.report.arn
+  allowed_tools      = ["*"]
+  max_iterations     = 4
+  timeout_seconds    = 60
+
+  model {
+    bedrock_model_config {
+      model_id    = local.report_profile
+      temperature = 0
+    }
+  }
+
+  system_prompt {
+    text = local.report_instruction
+  }
+
+  memory {
+    disabled {}
+  }
+
+  tool {
+    type = "agentcore_gateway"
+    name = "study_notes"
+
+    config {
+      agentcore_gateway {
+        gateway_arn = local.report_gateway_arn
+
+        outbound_auth {
+          aws_iam = true
+        }
+      }
+    }
+  }
+
+  tags = merge(var.tags, {
+    Name = local.report_harness_name
+  })
+
+  depends_on = [aws_iam_role_policy.report]
 }

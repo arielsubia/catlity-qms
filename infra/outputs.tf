@@ -122,3 +122,13 @@ output "bedrock_harness_arn" {
   description = "ARN of the Normative Advisor harness"
   value       = module.bedrock.harness_arn
 }
+
+output "bedrock_report_harness_id" {
+  description = "Id of the Report Generator harness"
+  value       = module.bedrock.report_harness_id
+}
+
+output "bedrock_report_harness_arn" {
+  description = "ARN of the Report Generator harness"
+  value       = module.bedrock.report_harness_arn
+}
