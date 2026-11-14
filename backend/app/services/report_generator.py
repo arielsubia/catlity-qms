@@ -10,10 +10,15 @@ Retrieve, and it is not translated. A later change can translate that string
 to English without touching the harness. A Spanish finding can therefore miss
 an English note. The report is still written, and the prompt tells the model
 not to invent a citation for that gap.
+
+``generate_report`` is the path behind the generate endpoint. It accepts only
+a completed audit, splits the harness text into the four headings, and stores
+that draft locally.
 """
 
 from __future__ import annotations
 
+import re
 import uuid
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
@@ -25,6 +30,8 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.models.audit import Audit
+from app.models.audit_report import AuditReport
+from app.models.base import generate_uuid
 from app.models.finding import Finding
 from app.models.tenant import Tenant
 from app.services.normative import Passage, document_name, knowledge_base_ids_for
@@ -57,6 +64,14 @@ class AuditNotFound(Exception):
     """No audit with this id belongs to the tenant."""
 
 
+class AuditNotCompleted(Exception):
+    """The audit exists, and its status is not completed."""
+
+
+class ReportDraftInvalid(Exception):
+    """The harness text did not include the four report sections."""
+
+
 class ReportUpstreamError(Exception):
     """Bedrock Retrieve or the report harness invocation failed."""
 
@@ -73,6 +88,50 @@ class ReportReference:
 class ReportDraft:
     text: str
     references: list[ReportReference]
+
+
+@dataclass(frozen=True)
+class ReportSections:
+    """The four headings the generate response returns."""
+
+    resumen: str
+    hallazgos: str
+    conclusiones: str
+    recomendaciones: str
+
+
+@dataclass(frozen=True)
+class GeneratedReport:
+    """One stored draft plus the file names retrieved for that call."""
+
+    id: str
+    audit_id: str
+    status: str
+    resumen: str
+    hallazgos: str
+    conclusiones: str
+    recomendaciones: str
+    references: list[ReportReference]
+
+
+_SECTION_FIELDS = {
+    "Resumen": "resumen",
+    "Hallazgos": "hallazgos",
+    "Conclusiones": "conclusiones",
+    "Recomendaciones": "recomendaciones",
+}
+_SECTION_ORDER = (
+    "Resumen",
+    "Hallazgos",
+    "Conclusiones",
+    "Recomendaciones",
+)
+_HEADING_LINE = re.compile(
+    r"^[ \t]*#{0,3}[ \t]*"
+    r"(Resumen|Hallazgos|Conclusiones|Recomendaciones)"
+    r"[ \t]*:?[ \t]*$",
+    re.MULTILINE,
+)
 
 
 class ReportBackend(Protocol):
@@ -182,6 +241,89 @@ def draft_report(
     return ReportDraft(text=text, references=reference_names(passages))
 
 
+def parse_report_sections(text: str) -> ReportSections:
+    """Split a harness draft on the four headings, in that order.
+
+    A heading is a line by itself. Leading markdown marks and a trailing
+    colon are accepted. Any other shape is rejected so a partial draft is
+    not stored.
+    """
+    matches = list(_HEADING_LINE.finditer(text))
+    names = [match.group(1) for match in matches]
+    if names != list(_SECTION_ORDER):
+        raise ReportDraftInvalid("The draft did not include the four sections")
+    values: dict[str, str] = {}
+    for index, match in enumerate(matches):
+        start = match.end()
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
+        body = text[start:end].strip()
+        if not body:
+            raise ReportDraftInvalid("The draft did not include the four sections")
+        values[_SECTION_FIELDS[match.group(1)]] = body
+    return ReportSections(
+        resumen=values["resumen"],
+        hallazgos=values["hallazgos"],
+        conclusiones=values["conclusiones"],
+        recomendaciones=values["recomendaciones"],
+    )
+
+
+def generate_report(
+    db: Session,
+    backend: ReportBackend,
+    *,
+    tenant_id: str,
+    user_id: str,
+    audit_id: str,
+) -> GeneratedReport:
+    """Draft a report for a completed audit and stage a local row.
+
+    The status check runs before Retrieve and the harness. The caller commits
+    the row. ``draft_report`` itself still accepts any status.
+    """
+    tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+    if tenant is None:
+        raise TenantNotFound(tenant_id)
+
+    audit = (
+        db.query(Audit).filter(Audit.id == audit_id, Audit.tenant_id == tenant_id).first()
+    )
+    if audit is None:
+        raise AuditNotFound(audit_id)
+    if audit.status != "completed":
+        raise AuditNotCompleted(audit_id)
+
+    draft = draft_report(
+        db,
+        backend,
+        tenant_id=tenant_id,
+        user_id=user_id,
+        audit_id=audit_id,
+    )
+    sections = parse_report_sections(draft.text)
+    row = AuditReport(
+        id=generate_uuid(),
+        tenant_id=tenant_id,
+        audit_id=audit.id,
+        status="draft",
+        resumen=sections.resumen,
+        hallazgos=sections.hallazgos,
+        conclusiones=sections.conclusiones,
+        recomendaciones=sections.recomendaciones,
+    )
+    db.add(row)
+    return GeneratedReport(
+        id=row.id,
+        audit_id=row.audit_id,
+        status=row.status,
+        resumen=row.resumen,
+        hallazgos=row.hallazgos,
+        conclusiones=row.conclusiones,
+        recomendaciones=row.recomendaciones,
+        references=draft.references,
+    )
+
+
 def collect_harness_text(events: Iterable[dict[str, Any]]) -> str:
     """Join the text deltas of one harness stream."""
     parts: list[str] = []
@@ -272,13 +414,18 @@ def get_report_backend() -> BotoReportBackend:
 
 # Re-exported so callers can catch the industry error without importing normative.
 __all__ = [
+    "AuditNotCompleted",
     "AuditNotFound",
     "BotoReportBackend",
+    "GeneratedReport",
     "REPORT_INSTRUCTION",
     "ReportDraft",
+    "ReportDraftInvalid",
     "ReportUpstreamError",
     "TenantNotFound",
     "draft_report",
+    "generate_report",
     "get_report_backend",
+    "parse_report_sections",
     "retrieval_query",
 ]
