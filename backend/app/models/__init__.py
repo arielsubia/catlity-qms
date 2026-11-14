@@ -1,4 +1,5 @@
 from app.models.audit import Audit
+from app.models.audit_report import AuditReport
 from app.models.base import Base
 from app.models.checklist import Checklist, ChecklistItem
 from app.models.corrective_action import CorrectiveAction
@@ -13,6 +14,7 @@ __all__ = [
     "Tenant",
     "User",
     "Audit",
+    "AuditReport",
     "Checklist",
     "ChecklistItem",
     "Finding",
