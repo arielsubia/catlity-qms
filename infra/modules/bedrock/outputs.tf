@@ -42,3 +42,18 @@ output "harness_arn" {
   description = "ARN of the Normative Advisor harness"
   value       = aws_bedrockagentcore_harness.normative.arn
 }
+
+output "report_role_arn" {
+  description = "ARN of the Report Generator harness execution role"
+  value       = aws_iam_role.report.arn
+}
+
+output "report_harness_id" {
+  description = "Id of the Report Generator harness"
+  value       = aws_bedrockagentcore_harness.report.harness_id
+}
+
+output "report_harness_arn" {
+  description = "ARN of the Report Generator harness"
+  value       = aws_bedrockagentcore_harness.report.arn
+}

@@ -29,6 +29,11 @@ class Settings(BaseSettings):
     normative_kb_automotive_id: str = "QWONN58E2H"
     normative_kb_pharmaceutical_id: str = "DX3IVAFQ6K"
 
+    report_harness_arn: str = (
+        "arn:aws:bedrock-agentcore:us-east-1:265751834002:"
+        "harness/Report_Generator-5fXUKujty7"
+    )
+
     @property
     def cognito_issuer(self) -> str:
         """OpenID Connect issuer URL for the configured user pool."""
