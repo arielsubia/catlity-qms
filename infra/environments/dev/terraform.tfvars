@@ -3,7 +3,7 @@ environment        = "dev"
 project_name       = "catlity-qms"
 vpc_cidr           = "10.0.0.0/16"
 budget_alert_email = "alerts@phildev.com"
-ses_sender_email   = "alerts@phildev.com"
+ses_sender_email   = "arielmsubia@gmail.com"
 
 # db_username and db_password should be provided via:
 # - Environment variables: TF_VAR_db_username, TF_VAR_db_password
