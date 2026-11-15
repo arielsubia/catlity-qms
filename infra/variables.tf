@@ -38,6 +38,11 @@ variable "budget_alert_email" {
   type        = string
 }
 
+variable "ses_sender_email" {
+  description = "Email address SES verifies as the sandbox sender"
+  type        = string
+}
+
 variable "cognito_callback_urls" {
   description = "Allowed OAuth callback URLs for the Cognito app client"
   type        = list(string)
