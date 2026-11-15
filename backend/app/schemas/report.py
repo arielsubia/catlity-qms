@@ -2,6 +2,10 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
+from app.services.report_html import report_plain_text, sanitize_report_html
+
+MAX_SECTION_LENGTH = 20_000
+
 
 class ReportGenerateRequest(BaseModel):
     """Audit whose completed findings become a draft report."""
@@ -39,3 +43,34 @@ class ReportGenerateResponse(BaseModel):
     conclusiones: str
     recomendaciones: str
     references: list[ReportReferenceResponse]
+
+
+class ReportDraftResponse(BaseModel):
+    """One stored draft. References are not columns on the row."""
+
+    id: str
+    audit_id: str
+    status: str
+    resumen: str
+    hallazgos: str
+    conclusiones: str
+    recomendaciones: str
+
+
+class ReportUpdateRequest(BaseModel):
+    """The four sections an editor can replace on an existing draft."""
+
+    resumen: str = Field(..., min_length=1, max_length=MAX_SECTION_LENGTH)
+    hallazgos: str = Field(..., min_length=1, max_length=MAX_SECTION_LENGTH)
+    conclusiones: str = Field(..., min_length=1, max_length=MAX_SECTION_LENGTH)
+    recomendaciones: str = Field(..., min_length=1, max_length=MAX_SECTION_LENGTH)
+
+    @field_validator("resumen", "hallazgos", "conclusiones", "recomendaciones")
+    @classmethod
+    def section_has_visible_text(cls, value: str) -> str:
+        cleaned = sanitize_report_html(value)
+        if not report_plain_text(cleaned):
+            raise ValueError("section text is required")
+        if len(cleaned) > MAX_SECTION_LENGTH:
+            raise ValueError("section text is too long")
+        return cleaned
