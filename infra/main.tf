@@ -65,3 +65,12 @@ module "bedrock" {
   knowledge_base_bucket_arn = module.knowledge_base.bucket_arn
   tags                      = local.common_tags
 }
+
+module "notifications" {
+  source = "./modules/notifications"
+
+  project_name = var.project_name
+  environment  = var.environment
+  sender_email = var.ses_sender_email
+  tags         = local.common_tags
+}

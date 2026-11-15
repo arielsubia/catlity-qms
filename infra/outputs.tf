@@ -132,3 +132,38 @@ output "bedrock_report_harness_arn" {
   description = "ARN of the Report Generator harness"
   value       = module.bedrock.report_harness_arn
 }
+
+output "notifications_sender_email" {
+  description = "Sandbox SES sender. Verification stays pending until that inbox confirms the address."
+  value       = module.notifications.sender_email
+}
+
+output "notifications_configuration_set_name" {
+  description = "SES configuration set that publishes delivery events"
+  value       = module.notifications.configuration_set_name
+}
+
+output "notifications_topic_arn" {
+  description = "ARN of the SNS topic for SES notification events"
+  value       = module.notifications.topic_arn
+}
+
+output "notifications_finding_assigned_template_name" {
+  description = "SES template name for an assigned finding"
+  value       = module.notifications.finding_assigned_template_name
+}
+
+output "notifications_corrective_action_overdue_template_name" {
+  description = "SES template name for an overdue corrective action"
+  value       = module.notifications.corrective_action_overdue_template_name
+}
+
+output "notifications_table_name" {
+  description = "Name of the notification history DynamoDB table"
+  value       = module.notifications.table_name
+}
+
+output "notifications_table_arn" {
+  description = "ARN of the notification history DynamoDB table"
+  value       = module.notifications.table_arn
+}
