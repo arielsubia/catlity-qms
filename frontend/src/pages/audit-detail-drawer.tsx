@@ -1,5 +1,6 @@
 import { Alert, Button, Drawer, Select, Space, Steps, Typography } from 'antd'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 
 import {
   assignAuditor,
@@ -10,13 +11,29 @@ import {
 } from '../api/audits-api'
 import { ApiError } from '../api/http'
 import {
+  generateReport,
+  getLatestReport,
+  updateReport,
+  type AuditReportDraft,
+  type ReportReference,
+  type ReportSections,
+} from '../api/reports-api'
+import {
   AUDIT_STATUSES,
   auditorLabel,
   formatStatusChangedAt,
   nextStatus,
   statusLabel,
 } from '../audits/audit-view'
-import { canAssignAuditor, canChangeStatus, canEditAudit } from '../audits/permissions'
+import {
+  canAssignAuditor,
+  canChangeStatus,
+  canEditAudit,
+  canGenerateReport,
+} from '../audits/permissions'
+import { REPORT_SECTIONS, sectionsHaveText } from '../reports/report-html'
+
+import { ReportEditor, type ReportEditorHandle } from './report-editor'
 
 interface AuditDetailDrawerProps {
   auditId: string
@@ -44,6 +61,14 @@ export const AuditDetailDrawer = ({
   const [assigneeId, setAssigneeId] = useState<string | undefined>(undefined)
   const [moving, setMoving] = useState(false)
   const [assigning, setAssigning] = useState(false)
+  const [report, setReport] = useState<AuditReportDraft | null>(null)
+  const [references, setReferences] = useState<ReportReference[]>([])
+  const [reportLoaded, setReportLoaded] = useState(false)
+  const [generating, setGenerating] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [printSections, setPrintSections] = useState<ReportSections | null>(null)
+  const editorRef = useRef<ReportEditorHandle>(null)
+  const requestSeq = useRef(0)
 
   useEffect(() => {
     let active = true
@@ -65,6 +90,39 @@ export const AuditDetailDrawer = ({
       active = false
     }
   }, [auditId, auditors])
+
+  const showReport = audit !== null && audit.status === 'completed' && canGenerateReport(role)
+
+  useEffect(() => {
+    if (!showReport || !audit) {
+      return
+    }
+    const seq = ++requestSeq.current
+    void getLatestReport(audit.id)
+      .then((row) => {
+        if (seq !== requestSeq.current) {
+          return
+        }
+        setReport(row)
+        setReferences([])
+        setReportLoaded(true)
+      })
+      .catch((err: unknown) => {
+        if (seq !== requestSeq.current) {
+          return
+        }
+        if (err instanceof ApiError && err.status === 404) {
+          setReport(null)
+          setReportLoaded(true)
+          return
+        }
+        setReportLoaded(true)
+        setActionError(actionMessage(err, 'Could not load the report.'))
+      })
+    return () => {
+      requestSeq.current += 1
+    }
+  }, [showReport, audit])
 
   const upcoming = audit ? nextStatus(audit.status) : null
   const currentIndex = audit
@@ -103,6 +161,70 @@ export const AuditDetailDrawer = ({
     } finally {
       setAssigning(false)
     }
+  }
+
+  const handleGenerate = async () => {
+    if (!audit) {
+      return
+    }
+    const seq = ++requestSeq.current
+    setActionError(null)
+    setGenerating(true)
+    try {
+      const created = await generateReport(audit.id)
+      if (seq !== requestSeq.current) {
+        return
+      }
+      setReport(created)
+      setReferences(created.references)
+      setReportLoaded(true)
+    } catch (err) {
+      setActionError(actionMessage(err, 'Could not generate the report.'))
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  const readSections = (): ReportSections | null => {
+    const sections = editorRef.current?.readSections()
+    if (!sections || !sectionsHaveText(sections)) {
+      setActionError('Each section needs text.')
+      return null
+    }
+    return sections
+  }
+
+  const handleSave = async () => {
+    if (!report) {
+      return
+    }
+    const sections = readSections()
+    if (!sections) {
+      return
+    }
+    setActionError(null)
+    setSaving(true)
+    try {
+      const updated = await updateReport(report.id, sections)
+      setReport(updated)
+    } catch (err) {
+      setActionError(actionMessage(err, 'Could not save the report.'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleExport = () => {
+    const sections = readSections()
+    if (!sections) {
+      return
+    }
+    setActionError(null)
+    flushSync(() => setPrintSections(sections))
+    if (typeof window.print === 'function') {
+      window.print()
+    }
+    setPrintSections(null)
   }
 
   return (
@@ -174,6 +296,53 @@ export const AuditDetailDrawer = ({
                 </Space>
               )}
             </div>
+          )}
+          {showReport && (
+            <div className="report-panel">
+              <Typography.Paragraph type="secondary">
+                Generar informe writes a new draft. Save report and Export PDF do not call AWS.
+              </Typography.Paragraph>
+              <Button loading={generating} onClick={handleGenerate}>
+                Generar informe
+              </Button>
+              {!reportLoaded && <Typography.Paragraph>Loading report.</Typography.Paragraph>}
+              {report && <ReportEditor ref={editorRef} draft={report} references={references} />}
+              {report && (
+                <Space wrap className="report-actions">
+                  <Button
+                    type="primary"
+                    loading={saving}
+                    disabled={generating}
+                    onClick={handleSave}
+                  >
+                    Save report
+                  </Button>
+                  <Button disabled={generating || saving} onClick={handleExport}>
+                    Export PDF
+                  </Button>
+                </Space>
+              )}
+            </div>
+          )}
+          {printSections && (
+            <article className="report-sheet" aria-hidden="true">
+              <p className="report-sheet-kicker">Catlity QMS</p>
+              <h1>{audit.title}</h1>
+              <p>Audit report · Draft</p>
+              <p>
+                {audit.planned_date
+                  ? `Planned date: ${audit.planned_date}`
+                  : 'Planned date: Not set'}
+              </p>
+              <div className="report-sheet-rule" />
+              {REPORT_SECTIONS.map((section) => (
+                <section key={section.key}>
+                  <h2>{section.label}</h2>
+                  <div dangerouslySetInnerHTML={{ __html: printSections[section.key] }} />
+                </section>
+              ))}
+              <p className="report-sheet-footer">Catlity QMS · Draft</p>
+            </article>
           )}
         </>
       )}

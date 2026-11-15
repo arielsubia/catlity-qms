@@ -13,6 +13,12 @@ import {
   type Audit,
 } from '../api/audits-api'
 import { ApiError } from '../api/http'
+import {
+  generateReport,
+  getLatestReport,
+  updateReport,
+  type AuditReportDraft,
+} from '../api/reports-api'
 import { AuthContext, type AuthContextValue } from '../auth/auth-context'
 
 import { AuditsPage } from './audits-page'
@@ -25,6 +31,12 @@ vi.mock('../api/audits-api', () => ({
   updateAudit: vi.fn(),
   assignAuditor: vi.fn(),
   updateAuditStatus: vi.fn(),
+}))
+
+vi.mock('../api/reports-api', () => ({
+  getLatestReport: vi.fn(),
+  generateReport: vi.fn(),
+  updateReport: vi.fn(),
 }))
 
 const audit = (overrides: Partial<Audit> = {}): Audit => ({
@@ -78,6 +90,10 @@ describe('AuditsPage', () => {
     vi.mocked(updateAudit).mockReset()
     vi.mocked(assignAuditor).mockReset()
     vi.mocked(updateAuditStatus).mockReset()
+    vi.mocked(getLatestReport).mockReset()
+    vi.mocked(generateReport).mockReset()
+    vi.mocked(updateReport).mockReset()
+    vi.mocked(getLatestReport).mockRejectedValue(new ApiError('Report not found', 404))
     vi.mocked(listAuditors).mockResolvedValue(roster)
     mockAudits([audit()])
   })
@@ -237,5 +253,95 @@ describe('AuditsPage', () => {
     expect(
       await screen.findByText('Could not reach the API. Check that the backend is running.'),
     ).toBeInTheDocument()
+  })
+
+  const storedReport = (overrides: Partial<AuditReportDraft> = {}): AuditReportDraft => ({
+    id: 'report-1',
+    audit_id: 'audit-1',
+    status: 'draft',
+    resumen: 'Policy gap',
+    hallazgos: 'Missing policy',
+    conclusiones: 'The policy is missing',
+    recomendaciones: 'Publish the policy',
+    ...overrides,
+  })
+
+  it('hides Generar informe when the role cannot draft a report', async () => {
+    const user = userEvent.setup()
+    mockAudits([audit({ status: 'completed' })])
+    renderPage('qa_manager')
+
+    await user.click(await screen.findByRole('button', { name: 'View' }))
+    const dialog = await screen.findByRole('dialog')
+    expect(await within(dialog).findByText('Check the line')).toBeInTheDocument()
+    expect(
+      within(dialog).queryByRole('button', { name: 'Generar informe' }),
+    ).not.toBeInTheDocument()
+    expect(getLatestReport).not.toHaveBeenCalled()
+  })
+
+  it('hides Generar informe when the audit is not completed', async () => {
+    const user = userEvent.setup()
+    renderPage('auditor')
+
+    await user.click(await screen.findByRole('button', { name: 'View' }))
+    const dialog = await screen.findByRole('dialog')
+    expect(await within(dialog).findByText('Check the line')).toBeInTheDocument()
+    expect(
+      within(dialog).queryByRole('button', { name: 'Generar informe' }),
+    ).not.toBeInTheDocument()
+    expect(getLatestReport).not.toHaveBeenCalled()
+  })
+
+  it('loads the saved draft and saves the four sections', async () => {
+    const user = userEvent.setup()
+    vi.mocked(getLatestReport).mockResolvedValue(storedReport())
+    vi.mocked(updateReport).mockResolvedValue(storedReport({ resumen: 'Policy gap' }))
+    mockAudits([audit({ status: 'completed' })])
+    renderPage('auditor')
+
+    await user.click(await screen.findByRole('button', { name: 'View' }))
+    const dialog = await screen.findByRole('dialog')
+    expect(
+      await within(dialog).findByRole('button', { name: 'Generar informe' }),
+    ).toBeInTheDocument()
+    expect(await within(dialog).findByRole('textbox', { name: 'Resumen' })).toHaveTextContent(
+      'Policy gap',
+    )
+
+    await user.click(within(dialog).getByRole('button', { name: 'Save report' }))
+
+    expect(updateReport).toHaveBeenCalledWith('report-1', {
+      resumen: 'Policy gap',
+      hallazgos: 'Missing policy',
+      conclusiones: 'The policy is missing',
+      recomendaciones: 'Publish the policy',
+    })
+  })
+
+  it('generates a draft and exports it through the browser print dialog', async () => {
+    const user = userEvent.setup()
+    const print = vi.fn()
+    window.print = print
+    vi.mocked(generateReport).mockResolvedValue({
+      ...storedReport({ id: 'report-2' }),
+      references: [
+        {
+          document: 'iso9001-context-leadership.txt',
+          section: 'iso9001-context-leadership.txt',
+        },
+      ],
+    })
+    mockAudits([audit({ status: 'completed' })])
+    renderPage('lead_auditor')
+
+    await user.click(await screen.findByRole('button', { name: 'View' }))
+    const dialog = await screen.findByRole('dialog')
+    await user.click(await within(dialog).findByRole('button', { name: 'Generar informe' }))
+
+    expect(generateReport).toHaveBeenCalledWith('audit-1')
+    expect(await within(dialog).findByText('iso9001-context-leadership.txt')).toBeInTheDocument()
+    await user.click(within(dialog).getByRole('button', { name: 'Export PDF' }))
+    expect(print).toHaveBeenCalledOnce()
   })
 })

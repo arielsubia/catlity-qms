@@ -1,8 +1,9 @@
-"""Generate route: completed audits, four sections, and a local draft row."""
+"""Report routes: generate a draft, read the latest row, and save edits."""
 
 from __future__ import annotations
 
 import time
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -40,8 +41,7 @@ Recomendaciones
 Publicar la política y explicarla al personal.
 """
 RETRIEVAL_QUERY = (
-    "Auditoría de línea\n"
-    "Falta la política de la calidad El personal no puede describirla. 5.2"
+    "Auditoría de línea\n" "Falta la política de la calidad El personal no puede describirla. 5.2"
 )
 
 
@@ -157,6 +157,41 @@ def _generate(
     )
 
 
+def _report(
+    db: Session,
+    tenant: Tenant,
+    audit: Audit,
+    *,
+    created_at: datetime | None = None,
+    resumen: str = "Resumen inicial",
+) -> AuditReport:
+    row = AuditReport(
+        tenant_id=tenant.id,
+        audit_id=audit.id,
+        status="draft",
+        resumen=resumen,
+        hallazgos="Hallazgos iniciales",
+        conclusiones="Conclusiones iniciales",
+        recomendaciones="Recomendaciones iniciales",
+    )
+    db.add(row)
+    db.commit()
+    if created_at is not None:
+        row.created_at = created_at
+        db.commit()
+    db.refresh(row)
+    return row
+
+
+def _sections(resumen: str = "Resumen editado") -> dict[str, str]:
+    return {
+        "resumen": resumen,
+        "hallazgos": "Hallazgos editados",
+        "conclusiones": "Conclusiones editadas",
+        "recomendaciones": "Recomendaciones editadas",
+    }
+
+
 def test_completed_audit_returns_spanish_sections_and_stores_a_draft(
     client: TestClient,
     db: Session,
@@ -178,8 +213,7 @@ def test_completed_audit_returns_spanish_sections_and_stores_a_draft(
         "La auditoría encontró una política que el personal no puede describir."
     )
     assert body["hallazgos"] == (
-        "Falta la política de la calidad. "
-        "El archivo citado es iso9001-context-leadership.txt."
+        "Falta la política de la calidad. " "El archivo citado es iso9001-context-leadership.txt."
     )
     assert body["conclusiones"] == "La política no está disponible para el personal."
     assert body["recomendaciones"] == "Publicar la política y explicarla al personal."
@@ -362,3 +396,188 @@ def test_parse_keeps_markdown_headings_and_the_file_name() -> None:
 def test_parse_rejects_a_missing_heading() -> None:
     with pytest.raises(ReportDraftInvalid):
         parse_report_sections("Resumen\nSolo un título.\n")
+
+
+def test_latest_report_is_the_newest_row_and_does_not_call_bedrock(
+    client: TestClient,
+    db: Session,
+    rsa_keypair: dict[str, Any],
+    fake_backend: FakeBackend,
+) -> None:
+    tenant, audit = _audit(db)
+    _report(
+        db,
+        tenant,
+        audit,
+        created_at=datetime(2026, 6, 1, tzinfo=UTC),
+        resumen="Nuevo",
+    )
+    _report(
+        db,
+        tenant,
+        audit,
+        created_at=datetime(2026, 1, 1, tzinfo=UTC),
+        resumen="Viejo",
+    )
+
+    response = client.get(
+        "/api/v1/ai/reports",
+        headers={"Authorization": f"Bearer {_token(rsa_keypair, tenant.id)}"},
+        params={"audit_id": audit.id},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["resumen"] == "Nuevo"
+    assert response.json()["status"] == "draft"
+    assert fake_backend.retrieved == []
+    assert fake_backend.messages == []
+
+
+def test_missing_report_is_not_found(
+    client: TestClient,
+    db: Session,
+    rsa_keypair: dict[str, Any],
+) -> None:
+    tenant, audit = _audit(db)
+
+    response = client.get(
+        "/api/v1/ai/reports",
+        headers={"Authorization": f"Bearer {_token(rsa_keypair, tenant.id)}"},
+        params={"audit_id": audit.id},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Report not found"
+
+
+@pytest.mark.parametrize("role", ["auditor", "lead_auditor", "admin"])
+def test_report_roles_can_read_and_update(
+    client: TestClient,
+    db: Session,
+    rsa_keypair: dict[str, Any],
+    fake_backend: FakeBackend,
+    role: str,
+) -> None:
+    tenant, audit = _audit(db)
+    row = _report(db, tenant, audit)
+    token = _token(rsa_keypair, tenant.id, role=role)
+
+    updated = client.patch(
+        f"/api/v1/ai/reports/{row.id}",
+        headers={"Authorization": f"Bearer {token}"},
+        json=_sections(),
+    )
+
+    assert updated.status_code == 200
+    body = updated.json()
+    assert body["id"] == row.id
+    assert body["status"] == "draft"
+    assert body["resumen"] == "Resumen editado"
+    db.refresh(row)
+    assert row.resumen == "Resumen editado"
+    assert row.status == "draft"
+    assert fake_backend.retrieved == []
+    assert fake_backend.messages == []
+
+
+@pytest.mark.parametrize("role", ["qa_manager", "auditee"])
+def test_other_roles_cannot_read_or_update(
+    client: TestClient,
+    db: Session,
+    rsa_keypair: dict[str, Any],
+    role: str,
+) -> None:
+    tenant, audit = _audit(db)
+    row = _report(db, tenant, audit)
+    token = _token(rsa_keypair, tenant.id, role=role)
+
+    read = client.get(
+        "/api/v1/ai/reports",
+        headers={"Authorization": f"Bearer {token}"},
+        params={"audit_id": audit.id},
+    )
+    updated = client.patch(
+        f"/api/v1/ai/reports/{row.id}",
+        headers={"Authorization": f"Bearer {token}"},
+        json=_sections(),
+    )
+
+    assert read.status_code == 403
+    assert updated.status_code == 403
+    db.refresh(row)
+    assert row.resumen == "Resumen inicial"
+
+
+def test_another_tenant_cannot_read_or_update_a_report(
+    client: TestClient,
+    db: Session,
+    rsa_keypair: dict[str, Any],
+) -> None:
+    owner, audit = _audit(db)
+    row = _report(db, owner, audit)
+    other = Tenant(name="Other", industry="pharmaceutical")
+    db.add(other)
+    db.commit()
+    token = _token(rsa_keypair, other.id)
+
+    read = client.get(
+        "/api/v1/ai/reports",
+        headers={"Authorization": f"Bearer {token}"},
+        params={"audit_id": audit.id},
+    )
+    updated = client.patch(
+        f"/api/v1/ai/reports/{row.id}",
+        headers={"Authorization": f"Bearer {token}"},
+        json=_sections(),
+    )
+
+    assert read.status_code == 404
+    assert read.json()["detail"] == "Audit not found"
+    assert updated.status_code == 404
+    assert updated.json()["detail"] == "Report not found"
+    db.refresh(row)
+    assert row.resumen == "Resumen inicial"
+
+
+def test_patch_keeps_bold_and_rejects_an_empty_section(
+    client: TestClient,
+    db: Session,
+    rsa_keypair: dict[str, Any],
+) -> None:
+    tenant, audit = _audit(db)
+    row = _report(db, tenant, audit)
+    token = _token(rsa_keypair, tenant.id)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    emptied = client.patch(
+        f"/api/v1/ai/reports/{row.id}",
+        headers=headers,
+        json=_sections("<script>alert(1)</script>"),
+    )
+    saved = client.patch(
+        f"/api/v1/ai/reports/{row.id}",
+        headers=headers,
+        json=_sections('<b onclick="x">Listo</b>'),
+    )
+
+    assert emptied.status_code == 422
+    assert "section text is required" in emptied.text
+    assert saved.status_code == 200
+    assert saved.json()["resumen"] == "<b>Listo</b>"
+    db.refresh(row)
+    assert row.resumen == "<b>Listo</b>"
+    assert "<script>" not in row.resumen
+
+
+def test_read_and_update_require_a_token(
+    client: TestClient,
+    db: Session,
+) -> None:
+    tenant, audit = _audit(db)
+    row = _report(db, tenant, audit)
+
+    read = client.get("/api/v1/ai/reports", params={"audit_id": audit.id})
+    updated = client.patch(f"/api/v1/ai/reports/{row.id}", json=_sections())
+
+    assert read.status_code == 401
+    assert updated.status_code == 401

@@ -208,6 +208,7 @@ export const AuditsPage = () => {
       />
       {viewingId && (
         <AuditDetailDrawer
+          key={viewingId}
           auditId={viewingId}
           role={user.role}
           auditors={auditors}

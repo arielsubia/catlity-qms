@@ -13,7 +13,8 @@ not to invent a citation for that gap.
 
 ``generate_report`` is the path behind the generate endpoint. It accepts only
 a completed audit, splits the harness text into the four headings, and stores
-that draft locally.
+that draft locally. ``latest_report`` and ``update_report`` read and edit that
+row. They do not call Bedrock.
 """
 
 from __future__ import annotations
@@ -76,6 +77,10 @@ class ReportUpstreamError(Exception):
     """Bedrock Retrieve or the report harness invocation failed."""
 
 
+class ReportNotFound(Exception):
+    """No draft with this id belongs to the tenant."""
+
+
 @dataclass(frozen=True)
 class ReportReference:
     """One cited study note. The file name fills both fields."""
@@ -127,9 +132,7 @@ _SECTION_ORDER = (
     "Recomendaciones",
 )
 _HEADING_LINE = re.compile(
-    r"^[ \t]*#{0,3}[ \t]*"
-    r"(Resumen|Hallazgos|Conclusiones|Recomendaciones)"
-    r"[ \t]*:?[ \t]*$",
+    r"^[ \t]*#{0,3}[ \t]*" r"(Resumen|Hallazgos|Conclusiones|Recomendaciones)" r"[ \t]*:?[ \t]*$",
     re.MULTILINE,
 )
 
@@ -216,9 +219,7 @@ def draft_report(
     if tenant is None:
         raise TenantNotFound(tenant_id)
 
-    audit = (
-        db.query(Audit).filter(Audit.id == audit_id, Audit.tenant_id == tenant_id).first()
-    )
+    audit = db.query(Audit).filter(Audit.id == audit_id, Audit.tenant_id == tenant_id).first()
     if audit is None:
         raise AuditNotFound(audit_id)
 
@@ -285,9 +286,7 @@ def generate_report(
     if tenant is None:
         raise TenantNotFound(tenant_id)
 
-    audit = (
-        db.query(Audit).filter(Audit.id == audit_id, Audit.tenant_id == tenant_id).first()
-    )
+    audit = db.query(Audit).filter(Audit.id == audit_id, Audit.tenant_id == tenant_id).first()
     if audit is None:
         raise AuditNotFound(audit_id)
     if audit.status != "completed":
@@ -322,6 +321,54 @@ def generate_report(
         recomendaciones=row.recomendaciones,
         references=draft.references,
     )
+
+
+def latest_report(db: Session, *, tenant_id: str, audit_id: str) -> AuditReport:
+    """Return the newest draft for an audit that belongs to the tenant.
+
+    The caller does not commit. A missing audit and a missing draft are
+    different errors so the editor can tell them apart.
+    """
+    audit = db.query(Audit).filter(Audit.id == audit_id, Audit.tenant_id == tenant_id).first()
+    if audit is None:
+        raise AuditNotFound(audit_id)
+
+    row = (
+        db.query(AuditReport)
+        .filter(AuditReport.audit_id == audit.id, AuditReport.tenant_id == tenant_id)
+        .order_by(AuditReport.created_at.desc(), AuditReport.id.desc())
+        .first()
+    )
+    if row is None:
+        raise ReportNotFound(audit_id)
+    return row
+
+
+def update_report(
+    db: Session,
+    *,
+    tenant_id: str,
+    report_id: str,
+    sections: ReportSections,
+) -> AuditReport:
+    """Replace the four sections of one draft and leave it editable.
+
+    The caller commits. The status stays ``draft``. This function does not
+    call Retrieve or the harness.
+    """
+    row = (
+        db.query(AuditReport)
+        .filter(AuditReport.id == report_id, AuditReport.tenant_id == tenant_id)
+        .first()
+    )
+    if row is None:
+        raise ReportNotFound(report_id)
+    row.resumen = sections.resumen
+    row.hallazgos = sections.hallazgos
+    row.conclusiones = sections.conclusiones
+    row.recomendaciones = sections.recomendaciones
+    row.status = "draft"
+    return row
 
 
 def collect_harness_text(events: Iterable[dict[str, Any]]) -> str:
@@ -361,9 +408,7 @@ class BotoReportBackend:
             response = self._runtime.retrieve(
                 knowledgeBaseId=knowledge_base_id,
                 retrievalQuery={"text": query},
-                retrievalConfiguration={
-                    "vectorSearchConfiguration": {"numberOfResults": 4}
-                },
+                retrievalConfiguration={"vectorSearchConfiguration": {"numberOfResults": 4}},
             )
         except ClientError as exc:
             code = exc.response.get("Error", {}).get("Code", "RetrieveFailed")
@@ -421,11 +466,14 @@ __all__ = [
     "REPORT_INSTRUCTION",
     "ReportDraft",
     "ReportDraftInvalid",
+    "ReportNotFound",
     "ReportUpstreamError",
     "TenantNotFound",
     "draft_report",
     "generate_report",
     "get_report_backend",
+    "latest_report",
     "parse_report_sections",
     "retrieval_query",
+    "update_report",
 ]
