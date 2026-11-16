@@ -1,5 +1,6 @@
 import { Alert, Button, Form, Select, Space, Table, Tag, Typography } from 'antd'
 import { useContext, useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 
 import { listAudits, type Audit } from '../api/audits-api'
 import { listFindings, type Finding } from '../api/findings-api'
@@ -41,7 +42,11 @@ export const FindingsPage = () => {
   const [audits, setAudits] = useState<Audit[]>([])
   const [auditsTruncated, setAuditsTruncated] = useState(false)
   const [form, setForm] = useState<FormState>(null)
-  const [viewingId, setViewingId] = useState<string | null>(null)
+  const [manualViewingId, setManualViewingId] = useState<string | null>(null)
+  const [linkedFinding, setLinkedFinding] = useState<Finding | null>(null)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const requestedFindingId = searchParams.get('finding')
+  const viewingId = manualViewingId ?? requestedFindingId
 
   useEffect(() => {
     if (!user) {
@@ -102,12 +107,43 @@ export const FindingsPage = () => {
     }
   }, [user, page, typeFilter, statusFilter, reloadKey])
 
+  useEffect(() => {
+    if (!user || !requestedFindingId) {
+      return
+    }
+    let active = true
+    void listFindings({ skip: 0, limit: 100 })
+      .then((result) => {
+        if (active) {
+          setLinkedFinding(result.items.find((item) => item.id === requestedFindingId) ?? null)
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setLinkedFinding(null)
+        }
+      })
+    return () => {
+      active = false
+    }
+  }, [user, requestedFindingId])
+
   if (!user) {
     return null
   }
 
   const visibleFindings = filterByResponsible(findings, responsibleFilter)
-  const viewing = findings.find((item) => item.id === viewingId) ?? null
+  const viewing =
+    findings.find((item) => item.id === viewingId) ??
+    (linkedFinding?.id === viewingId ? linkedFinding : null)
+  const closeViewing = () => {
+    setManualViewingId(null)
+    if (searchParams.get('finding')) {
+      const next = new URLSearchParams(searchParams)
+      next.delete('finding')
+      setSearchParams(next, { replace: true })
+    }
+  }
   const replaceFinding = (next: Finding) => {
     setFindings((current) => current.map((item) => (item.id === next.id ? next : item)))
   }
@@ -230,7 +266,7 @@ export const FindingsPage = () => {
             key: 'actions',
             render: (_, record) => (
               <Space>
-                <Button type="link" onClick={() => setViewingId(record.id)}>
+                <Button type="link" onClick={() => setManualViewingId(record.id)}>
                   View
                 </Button>
                 {canEditFinding(user.role) && (
@@ -248,9 +284,9 @@ export const FindingsPage = () => {
           finding={viewing}
           role={user.role}
           auditTitle={auditLabel(viewing.audit_id, audits)}
-          onClose={() => setViewingId(null)}
+          onClose={closeViewing}
           onEdit={(row) => {
-            setViewingId(null)
+            setManualViewingId(null)
             setForm({ mode: 'edit', finding: row })
           }}
           onUpdated={(next) => {

@@ -6,6 +6,8 @@ import { listFindings } from '../api/findings-api'
 import { useAuth } from '../auth/use-auth'
 import { OpenFindingsContext } from '../findings/open-findings-context'
 import { NAV_ITEMS } from './nav-items'
+import { NotificationBell } from './notification-bell'
+import { NotificationInboxContext } from './notification-inbox-context'
 
 const { Content, Header, Sider } = Layout
 
@@ -22,6 +24,14 @@ export const AppLayout = () => {
     setOpenCountKey((key) => key + 1)
   }, [])
   const openFindings = useMemo(() => ({ refresh: refreshOpenFindings }), [refreshOpenFindings])
+  const [inboxRevision, setInboxRevision] = useState(0)
+  const refreshInbox = useCallback(() => {
+    setInboxRevision((revision) => revision + 1)
+  }, [])
+  const inbox = useMemo(
+    () => ({ revision: inboxRevision, refresh: refreshInbox }),
+    [inboxRevision, refreshInbox],
+  )
 
   useEffect(() => {
     if (!user) {
@@ -71,73 +81,76 @@ export const AppLayout = () => {
 
   return (
     <OpenFindingsContext.Provider value={openFindings}>
-      <Layout className="app-layout">
-        <Header
-          className="app-header"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 16,
-            height: 'auto',
-            minHeight: 64,
-            padding: '12px 16px',
-            lineHeight: 1.4,
-            background: '#fff',
-            color: 'rgba(0, 0, 0, 0.88)',
-          }}
-        >
-          {isCompact && (
-            <Button onClick={() => setCollapsed((isCollapsed) => !isCollapsed)}>
-              {collapsed ? 'Open menu' : 'Close menu'}
-            </Button>
-          )}
-          <div className="app-header-user">
-            <Typography.Text>{user.email}</Typography.Text>
-            <Typography.Text>{user.role}</Typography.Text>
-            <Typography.Text>
-              <Typography.Text type="secondary">Organization</Typography.Text> {user.tenantId}
-            </Typography.Text>
-          </div>
-          <Button onClick={handleSignOut} loading={signingOut}>
-            Sign out
-          </Button>
-        </Header>
-        <Layout className="app-body">
-          <Sider
-            collapsible
-            collapsed={collapsed}
-            breakpoint="lg"
-            collapsedWidth={0}
-            trigger={isCompact ? null : undefined}
-            onBreakpoint={setIsCompact}
-            onCollapse={setCollapsed}
+      <NotificationInboxContext.Provider value={inbox}>
+        <Layout className="app-layout">
+          <Header
+            className="app-header"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 16,
+              height: 'auto',
+              minHeight: 64,
+              padding: '12px 16px',
+              lineHeight: 1.4,
+              background: '#fff',
+              color: 'rgba(0, 0, 0, 0.88)',
+            }}
           >
-            <div className="app-sider-brand">Catlity QMS</div>
-            <Menu
-              theme="dark"
-              mode="inline"
-              selectedKeys={[pathname]}
-              items={NAV_ITEMS.map((item) => ({
-                key: item.path,
-                label: (
-                  <Link to={item.path}>
-                    <span className="nav-item-label">
-                      {item.label}
-                      {item.path === '/findings' && openCount !== null && (
-                        <Badge count={openCount} showZero className="nav-findings-count" />
-                      )}
-                    </span>
-                  </Link>
-                ),
-              }))}
-              onClick={handleMenuClick}
-            />
-          </Sider>
-          <Content className="app-content">
-            <Outlet />
-          </Content>
+            {isCompact && (
+              <Button onClick={() => setCollapsed((isCollapsed) => !isCollapsed)}>
+                {collapsed ? 'Open menu' : 'Close menu'}
+              </Button>
+            )}
+            <div className="app-header-user">
+              <Typography.Text>{user.email}</Typography.Text>
+              <Typography.Text>{user.role}</Typography.Text>
+              <Typography.Text>
+                <Typography.Text type="secondary">Organization</Typography.Text> {user.tenantId}
+              </Typography.Text>
+            </div>
+            <NotificationBell />
+            <Button onClick={handleSignOut} loading={signingOut}>
+              Sign out
+            </Button>
+          </Header>
+          <Layout className="app-body">
+            <Sider
+              collapsible
+              collapsed={collapsed}
+              breakpoint="lg"
+              collapsedWidth={0}
+              trigger={isCompact ? null : undefined}
+              onBreakpoint={setIsCompact}
+              onCollapse={setCollapsed}
+            >
+              <div className="app-sider-brand">Catlity QMS</div>
+              <Menu
+                theme="dark"
+                mode="inline"
+                selectedKeys={[pathname]}
+                items={NAV_ITEMS.map((item) => ({
+                  key: item.path,
+                  label: (
+                    <Link to={item.path}>
+                      <span className="nav-item-label">
+                        {item.label}
+                        {item.path === '/findings' && openCount !== null && (
+                          <Badge count={openCount} showZero className="nav-findings-count" />
+                        )}
+                      </span>
+                    </Link>
+                  ),
+                }))}
+                onClick={handleMenuClick}
+              />
+            </Sider>
+            <Content className="app-content">
+              <Outlet />
+            </Content>
+          </Layout>
         </Layout>
-      </Layout>
+      </NotificationInboxContext.Provider>
     </OpenFindingsContext.Provider>
   )
 }

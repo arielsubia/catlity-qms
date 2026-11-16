@@ -1,5 +1,6 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { listAudits, type Audit } from '../api/audits-api'
@@ -70,18 +71,20 @@ const finding = (overrides: Partial<Finding> = {}): Finding => ({
   ...overrides,
 })
 
-const renderPage = (role: string, refresh = vi.fn()) => {
+const renderPage = (role: string, refresh = vi.fn(), path = '/findings') => {
   const value: AuthContextValue = {
     user: { email: 'ana@acme.com', tenantId: 'tenant-acme', role },
     signIn: vi.fn(),
     signOut: vi.fn(),
   }
   render(
-    <AuthContext.Provider value={value}>
-      <OpenFindingsContext.Provider value={{ refresh }}>
-        <FindingsPage />
-      </OpenFindingsContext.Provider>
-    </AuthContext.Provider>,
+    <MemoryRouter initialEntries={[path]}>
+      <AuthContext.Provider value={value}>
+        <OpenFindingsContext.Provider value={{ refresh }}>
+          <FindingsPage />
+        </OpenFindingsContext.Provider>
+      </AuthContext.Provider>
+    </MemoryRouter>,
   )
   return refresh
 }
@@ -331,6 +334,29 @@ describe('FindingsPage', () => {
     expect(await screen.findByText('Renamed finding')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'New finding' })).toBeInTheDocument()
     expect(refresh).not.toHaveBeenCalled()
+  })
+
+  it('opens the finding linked from a notification', async () => {
+    vi.mocked(listFindings).mockImplementation(async (query) => {
+      if (query.limit === 100) {
+        return {
+          items: [finding({ id: 'finding-9', title: 'From the inbox' })],
+          total: 1,
+          skip: 0,
+          limit: 100,
+        }
+      }
+      return {
+        items: [finding({ id: 'finding-1', title: 'On this page' })],
+        total: 1,
+        skip: 0,
+        limit: query.limit,
+      }
+    })
+    renderPage('auditor', vi.fn(), '/findings?finding=finding-9')
+
+    expect(await screen.findByText('From the inbox')).toBeInTheDocument()
+    expect(screen.getByText('On this page')).toBeInTheDocument()
   })
 
   it('shows the list error from the API', async () => {

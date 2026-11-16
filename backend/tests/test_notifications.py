@@ -52,14 +52,10 @@ def rsa_keypair() -> dict[str, Any]:
 
 
 @pytest.fixture(autouse=True)
-def configure_cognito(
-    rsa_keypair: dict[str, Any], monkeypatch: pytest.MonkeyPatch
-) -> None:
+def configure_cognito(rsa_keypair: dict[str, Any], monkeypatch: pytest.MonkeyPatch) -> None:
     """Point settings at a fake pool and preload the JWKS cache."""
     monkeypatch.setattr(settings, "cognito_user_pool_id", "us-east-1_test", raising=False)
-    monkeypatch.setattr(
-        settings, "cognito_app_client_id", "test-client-id", raising=False
-    )
+    monkeypatch.setattr(settings, "cognito_app_client_id", "test-client-id", raising=False)
     monkeypatch.setattr(settings, "aws_region", "us-east-1", raising=False)
     kid = rsa_keypair["public_jwk"]["kid"]
     security._jwks_cache._keys = {kid: rsa_keypair["public_jwk"]}
@@ -115,7 +111,11 @@ class FakeDynamo:
                 {"Error": {"Code": "ConditionalCheckFailedException", "Message": "missing"}},
                 "UpdateItem",
             )
-        self.items[key]["status"] = kwargs["ExpressionAttributeValues"][":status"]
+        values = kwargs["ExpressionAttributeValues"]
+        if ":status" in values:
+            self.items[key]["status"] = values[":status"]
+        if ":read" in values:
+            self.items[key]["read"] = values[":read"]
 
 
 def _service(
@@ -185,6 +185,10 @@ def test_finding_email_retries_then_records_sent() -> None:
     assert item["status"]["S"] == "sent"
     assert item["ses_message_id"]["S"] == "ses-msg-1"
     assert item["kind"]["S"] == "finding_assigned"
+    assert item["read"]["S"] == "false"
+    assert item["title"]["S"] == "Gauge out of tolerance"
+    assert item["finding_id"]["S"] == "finding-1"
+    assert item["created_at"]["S"]
 
 
 def test_exhausted_retries_record_failed() -> None:
@@ -229,9 +233,7 @@ def test_create_finding_with_assignee_sends_email(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     service, ses, dynamo, _slept = _service()
-    monkeypatch.setattr(
-        "app.api.v1.findings.get_notification_service", lambda: service
-    )
+    monkeypatch.setattr("app.api.v1.findings.get_notification_service", lambda: service)
     tenant_id = _create_tenant(client, "Notify Findings")
     auditee = _auditee(db, tenant_id)
     token = _token(rsa_keypair, tenant_id)
@@ -279,9 +281,7 @@ def test_create_finding_keeps_row_when_mail_record_fails(
     assert response.json()["assignee_id"] == auditee.id
 
 
-def test_unknown_assignee_returns_422(
-    client: TestClient, rsa_keypair: dict[str, Any]
-) -> None:
+def test_unknown_assignee_returns_422(client: TestClient, rsa_keypair: dict[str, Any]) -> None:
     tenant_id = _create_tenant(client, "Bad Assignee")
     token = _token(rsa_keypair, tenant_id)
     audit = _create_audit(client, token)
@@ -300,9 +300,7 @@ def test_overdue_reminder_goes_to_responsible_and_is_not_repeated(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     service, ses, _dynamo, _slept = _service(today=date(2026, 11, 15))
-    monkeypatch.setattr(
-        "app.api.v1.notifications.get_notification_service", lambda: service
-    )
+    monkeypatch.setattr("app.api.v1.notifications.get_notification_service", lambda: service)
     monkeypatch.setattr("app.api.v1.findings.get_notification_service", lambda: service)
     tenant_id = _create_tenant(client, "Overdue Org")
     auditee = _auditee(db, tenant_id, email="owner@example.com")
@@ -327,19 +325,21 @@ def test_overdue_reminder_goes_to_responsible_and_is_not_repeated(
     assert created.status_code == 201
     assert created.json()["responsible_id"] == auditee.id
 
-    first = client.post(
-        "/api/v1/notifications/overdue-reminders", headers=_auth(admin)
-    )
+    first = client.post("/api/v1/notifications/overdue-reminders", headers=_auth(admin))
     assert first.status_code == 200
     assert first.json() == {"sent": 1, "failed": 0, "skipped": 0}
+    overdue = next(
+        item for item in _dynamo.items.values() if item["kind"]["S"] == "corrective_action_overdue"
+    )
+    assert overdue["finding_id"]["S"] == finding.json()["id"]
+    assert overdue["resource_id"]["S"] == created.json()["id"]
+    assert overdue["read"]["S"] == "false"
     reminder = ses.calls[-1]
     assert reminder["Template"] == "corrective-action-overdue"
     assert reminder["Destination"]["ToAddresses"] == ["owner@example.com"]
     assert json.loads(reminder["TemplateData"])["due_date"] == "2026-11-01"
 
-    second = client.post(
-        "/api/v1/notifications/overdue-reminders", headers=_auth(admin)
-    )
+    second = client.post("/api/v1/notifications/overdue-reminders", headers=_auth(admin))
     assert second.status_code == 200
     assert second.json() == {"sent": 0, "failed": 0, "skipped": 1}
     assert len(ses.calls) == 2
@@ -352,9 +352,7 @@ def test_overdue_without_responsible_uses_the_finding_assignee(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     service, ses, _dynamo, _slept = _service(today=date(2026, 11, 15))
-    monkeypatch.setattr(
-        "app.api.v1.notifications.get_notification_service", lambda: service
-    )
+    monkeypatch.setattr("app.api.v1.notifications.get_notification_service", lambda: service)
     monkeypatch.setattr("app.api.v1.findings.get_notification_service", lambda: service)
     tenant_id = _create_tenant(client, "Fallback Org")
     auditee = _auditee(db, tenant_id, email="fallback@example.com")
@@ -372,9 +370,7 @@ def test_overdue_without_responsible_uses_the_finding_assignee(
         headers=_auth(admin),
     )
     assert action.status_code == 201
-    response = client.post(
-        "/api/v1/notifications/overdue-reminders", headers=_auth(admin)
-    )
+    response = client.post("/api/v1/notifications/overdue-reminders", headers=_auth(admin))
     assert response.json()["sent"] == 1
     assert ses.calls[-1]["Destination"]["ToAddresses"] == ["fallback@example.com"]
 
@@ -386,9 +382,7 @@ def test_future_and_completed_actions_are_skipped(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     service, ses, _dynamo, _slept = _service(today=date(2026, 11, 15))
-    monkeypatch.setattr(
-        "app.api.v1.notifications.get_notification_service", lambda: service
-    )
+    monkeypatch.setattr("app.api.v1.notifications.get_notification_service", lambda: service)
     tenant_id = _create_tenant(client, "Not Due Org")
     auditee = _auditee(db, tenant_id)
     admin = _token(rsa_keypair, tenant_id, role="admin")
@@ -418,27 +412,106 @@ def test_future_and_completed_actions_are_skipped(
         },
         headers=_auth(admin),
     )
-    response = client.post(
-        "/api/v1/notifications/overdue-reminders", headers=_auth(admin)
-    )
+    response = client.post("/api/v1/notifications/overdue-reminders", headers=_auth(admin))
     assert response.json() == {"sent": 0, "failed": 0, "skipped": 0}
     assert ses.calls == []
 
 
-def test_overdue_route_rejects_non_admin(
-    client: TestClient, rsa_keypair: dict[str, Any]
+def test_inbox_is_per_recipient_and_read_does_not_change_status(
+    client: TestClient,
+    db: Session,
+    rsa_keypair: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    service, _ses, dynamo, _slept = _service()
+    monkeypatch.setattr("app.api.v1.notifications.get_notification_service", lambda: service)
+    monkeypatch.setattr("app.api.v1.findings.get_notification_service", lambda: service)
+    tenant_id = _create_tenant(client, "Inbox Org")
+    auditee = _auditee(db, tenant_id, email="ada@example.com")
+    auditor = _token(rsa_keypair, tenant_id, role="auditor", sub="auditor-sub")
+    reader = make_token(
+        rsa_keypair,
+        tenant_id=tenant_id,
+        role="auditee",
+        email="ada@example.com",
+        sub="auditee-sub",
+    )
+    audit = _create_audit(client, auditor)
+    created = client.post(
+        f"/api/v1/audits/{audit['id']}/findings",
+        json={"title": "Gauge drift", "assignee_id": auditee.id},
+        headers=_auth(auditor),
+    )
+    assert created.status_code == 201
+    dynamo.put_item(
+        TableName="notifications",
+        Item={
+            "tenant_id": {"S": tenant_id},
+            "notification_id": {"S": "legacy-note"},
+            "status": {"S": "delivered"},
+            "kind": {"S": "finding_assigned"},
+            "resource_id": {"S": "finding-old"},
+            "recipient_email": {"S": "ada@example.com"},
+        },
+    )
+
+    listed = client.get("/api/v1/notifications?limit=1", headers=_auth(reader))
+    assert listed.status_code == 200
+    body = listed.json()
+    assert body["unread_count"] == 2
+    assert len(body["items"]) == 1
+    assert body["items"][0]["title"] == "Gauge drift"
+    assert body["items"][0]["finding_id"] == created.json()["id"]
+    assert body["items"][0]["read"] is False
+
+    hidden = client.get("/api/v1/notifications", headers=_auth(auditor))
+    assert hidden.status_code == 200
+    assert hidden.json() == {"items": [], "unread_count": 0}
+
+    note_id = body["items"][0]["id"]
+    denied = client.patch(
+        f"/api/v1/notifications/{note_id}",
+        json={"read": True},
+        headers=_auth(auditor),
+    )
+    assert denied.status_code == 404
+    marked = client.patch(
+        f"/api/v1/notifications/{note_id}",
+        json={"read": True},
+        headers=_auth(reader),
+    )
+    assert marked.status_code == 200
+    assert marked.json() == {"id": note_id, "read": True}
+    stored = dynamo.items[(tenant_id, note_id)]
+    assert stored["read"]["S"] == "true"
+    assert stored["status"]["S"] == "sent"
+
+    cleared = client.post("/api/v1/notifications/read", headers=_auth(reader))
+    assert cleared.status_code == 200
+    assert cleared.json() == {"updated": 1}
+    again = client.get("/api/v1/notifications", headers=_auth(reader))
+    assert again.json()["unread_count"] == 0
+
+
+def test_mark_read_rejects_false(client: TestClient, rsa_keypair: dict[str, Any]) -> None:
+    tenant_id = _create_tenant(client, "Read Only")
+    token = _token(rsa_keypair, tenant_id)
+    response = client.patch(
+        "/api/v1/notifications/note-1",
+        json={"read": False},
+        headers=_auth(token),
+    )
+    assert response.status_code == 422
+
+
+def test_overdue_route_rejects_non_admin(client: TestClient, rsa_keypair: dict[str, Any]) -> None:
     tenant_id = _create_tenant(client, "Auditor Reminder")
     token = _token(rsa_keypair, tenant_id, role="auditor")
-    response = client.post(
-        "/api/v1/notifications/overdue-reminders", headers=_auth(token)
-    )
+    response = client.post("/api/v1/notifications/overdue-reminders", headers=_auth(token))
     assert response.status_code == 403
 
 
-def test_unknown_responsible_returns_422(
-    client: TestClient, rsa_keypair: dict[str, Any]
-) -> None:
+def test_unknown_responsible_returns_422(client: TestClient, rsa_keypair: dict[str, Any]) -> None:
     tenant_id = _create_tenant(client, "Bad Responsible")
     admin = _token(rsa_keypair, tenant_id, role="admin")
     auditor = _token(rsa_keypair, tenant_id, role="auditor", sub="auditor-sub")

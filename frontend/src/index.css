@@ -282,3 +282,59 @@ body {
   margin: 0 0 8px;
   padding-left: 1.25rem;
 }
+
+.notification-bell {
+  display: inline-flex;
+}
+
+.notification-panel {
+  width: 320px;
+  padding: 8px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+}
+
+.notification-empty {
+  margin: 8px;
+}
+
+.notification-list,
+.notification-history {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.notification-history li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.notification-item {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.notification-item-unread,
+.notification-item-unread .notification-item {
+  font-weight: 600;
+}
+
+.notification-when {
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.notification-panel-actions {
+  display: flex;
+  justify-content: space-between;
+}
