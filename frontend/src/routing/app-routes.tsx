@@ -8,6 +8,7 @@ import { RegisterPage } from '../pages/register-page'
 import { AiAgentPage } from '../pages/ai-agent-page'
 import { AuditsPage } from '../pages/audits-page'
 import { FindingsPage } from '../pages/findings-page'
+import { NotificationsPage } from '../pages/notifications-page'
 import { SectionPage } from '../pages/section-page'
 import { GuestOnly, RequireAuth, SessionRedirect } from './guards'
 
@@ -37,6 +38,7 @@ export const AppRoutes = () => (
         {NAV_ITEMS.map((item) => (
           <Route key={item.path} path={item.path.slice(1)} element={pageFor(item.path)} />
         ))}
+        <Route path="notifications" element={<NotificationsPage />} />
       </Route>
     </Route>
     <Route path="*" element={<SessionRedirect />} />

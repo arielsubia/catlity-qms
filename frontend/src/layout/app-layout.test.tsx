@@ -14,6 +14,14 @@ vi.mock('../api/findings-api', () => ({
   listFindings: vi.fn().mockResolvedValue({ items: [], total: 4, skip: 0, limit: 1 }),
 }))
 
+vi.mock('../api/notifications-api', () => ({
+  listNotifications: vi.fn().mockResolvedValue({ items: [], unread_count: 0 }),
+  markNotificationRead: vi.fn(),
+  markAllNotificationsRead: vi.fn(),
+  findingPath: (findingId: string | null) =>
+    findingId ? `/findings?finding=${findingId}` : '/findings',
+}))
+
 const user: SessionUser = {
   email: 'ana@acme.com',
   tenantId: 'tenant-acme',
@@ -92,6 +100,7 @@ describe('AppLayout', () => {
     expect(screen.getByText('auditor')).toBeInTheDocument()
     expect(screen.getByText('tenant-acme')).toBeInTheDocument()
     expect(screen.getByText('Organization')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Notifications' })).toBeInTheDocument()
   })
 
   it('signs the user out from the header', async () => {

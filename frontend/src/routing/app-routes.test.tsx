@@ -30,6 +30,14 @@ vi.mock('../api/normative-api', () => ({
   queryNormative: vi.fn(),
 }))
 
+vi.mock('../api/notifications-api', () => ({
+  listNotifications: vi.fn().mockResolvedValue({ items: [], unread_count: 0 }),
+  markNotificationRead: vi.fn(),
+  markAllNotificationsRead: vi.fn(),
+  findingPath: (findingId: string | null) =>
+    findingId ? `/findings?finding=${findingId}` : '/findings',
+}))
+
 const signedInUser: SessionUser = {
   email: 'ana@acme.com',
   tenantId: 'tenant-acme',
@@ -114,6 +122,21 @@ describe('AppRoutes', () => {
     expect(screen.getByRole('textbox', { name: 'Question' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Send' })).toBeInTheDocument()
     expect(screen.queryByText('This section is not available yet.')).not.toBeInTheDocument()
+  })
+
+  it('sends /notifications to login when there is no session', () => {
+    renderRoutes('/notifications', null)
+
+    expect(screen.getByText('Sign in to Catlity QMS')).toBeInTheDocument()
+  })
+
+  it('renders the notification center for a signed-in user', async () => {
+    renderRoutes('/notifications', signedInUser)
+
+    expect(
+      await screen.findByRole('heading', { level: 2, name: 'Notifications' }),
+    ).toBeInTheDocument()
+    expect(await screen.findByText('No notifications')).toBeInTheDocument()
   })
 
   it('renders the findings screen for a signed-in user', async () => {
