@@ -22,8 +22,8 @@ class FindingCreate(BaseModel):
     """Fields the client may set when recording a finding.
 
     Status is not accepted here. The API always stores ``open``.
-    The assignee is left empty; lifecycle and corrective actions use
-    other routes.
+    ``assignee_id`` is optional. When it is set, the user must be an active
+    auditee of the same tenant, and the API mails that person.
     """
 
     title: str = Field(..., min_length=1, max_length=255)
@@ -31,6 +31,7 @@ class FindingCreate(BaseModel):
     finding_type: FindingType = "minor_nc"
     severity: str = Field(default="medium", min_length=1, max_length=50)
     clause_reference: str | None = Field(None, max_length=100)
+    assignee_id: str | None = Field(None, min_length=1, max_length=36)
 
 
 class FindingUpdate(BaseModel):

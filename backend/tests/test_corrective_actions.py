@@ -145,7 +145,6 @@ def test_create_action_starts_pending(
             "effectiveness": "Effective after review",
             "status": "closed",
             "action_type": "preventive",
-            "responsible_id": "someone",
             "finding_id": other[2],
         },
         headers=_auth(auditee),
