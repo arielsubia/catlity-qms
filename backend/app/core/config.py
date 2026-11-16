@@ -34,6 +34,15 @@ class Settings(BaseSettings):
         "harness/Report_Generator-5fXUKujty7"
     )
 
+    # Notifications. The identity, templates, configuration set, and table
+    # already exist in us-east-1 from module.notifications.
+    ses_sender_email: str = "arielmsubia@gmail.com"
+    ses_configuration_set: str = "catlity-qms-dev-notifications"
+    notifications_table_name: str = "catlity-qms-dev-notifications"
+    finding_assigned_template: str = "finding-assigned"
+    corrective_action_overdue_template: str = "corrective-action-overdue"
+    app_public_url: str = "http://localhost:5173"
+
     @property
     def cognito_issuer(self) -> str:
         """OpenID Connect issuer URL for the configured user pool."""

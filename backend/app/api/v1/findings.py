@@ -1,3 +1,4 @@
+import logging
 from datetime import UTC, datetime
 from typing import Annotated
 
@@ -18,8 +19,10 @@ from app.schemas.finding import (
     FindingType,
     FindingUpdate,
 )
+from app.services.notifications import get_notification_service
 
 router = APIRouter(tags=["findings"])
+logger = logging.getLogger(__name__)
 
 # The QA manager and the auditee consult findings and do not record them.
 FINDING_EDITOR_ROLES = ["auditor", "admin", "lead_auditor"]
@@ -100,6 +103,26 @@ def _get_tenant_audit(db: Session, audit_id: str, tenant_id: str) -> Audit:
     return audit
 
 
+def _get_tenant_auditee(db: Session, tenant_id: str, user_id: str) -> User:
+    """Return an active auditee of this tenant, or 422 when the id does not match."""
+    assignee = (
+        db.query(User)
+        .filter(
+            User.id == user_id,
+            User.tenant_id == tenant_id,
+            User.role == "auditee",
+            User.is_active.is_(True),
+        )
+        .first()
+    )
+    if assignee is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Assignee must be an active auditee in this tenant",
+        )
+    return assignee
+
+
 def _get_tenant_finding(db: Session, finding_id: str, tenant_id: str) -> Finding:
     """Return the finding when it belongs to the caller, otherwise 404."""
     finding = (
@@ -140,10 +163,17 @@ def create_finding(
 ) -> Finding:
     """Create a finding on an audit that belongs to the caller's tenant.
 
-    The new row always starts as ``open`` with no assignee. The client
-    cannot choose a status on this route.
+    The new row always starts as ``open``. An optional ``assignee_id`` must
+    be an active auditee of the same tenant. That person receives the
+    finding-assigned email after the row is stored. A mail failure stays in
+    the notification history and still returns the finding.
     """
-    _get_tenant_audit(db, audit_id, current_user.tenant_id)
+    audit = _get_tenant_audit(db, audit_id, current_user.tenant_id)
+    assignee = None
+    if finding_in.assignee_id:
+        assignee = _get_tenant_auditee(
+            db, current_user.tenant_id, finding_in.assignee_id
+        )
     finding = Finding(
         tenant_id=current_user.tenant_id,
         audit_id=audit_id,
@@ -153,10 +183,23 @@ def create_finding(
         severity=finding_in.severity,
         clause_reference=finding_in.clause_reference,
         status="open",
+        assignee_id=assignee.id if assignee else None,
     )
     db.add(finding)
     db.commit()
     db.refresh(finding)
+    if assignee is not None:
+        try:
+            get_notification_service().send_finding_assigned(
+                tenant_id=current_user.tenant_id,
+                finding_id=finding.id,
+                recipient_email=assignee.email,
+                recipient_name=assignee.full_name,
+                finding_title=finding.title,
+                audit_name=audit.title,
+            )
+        except Exception:
+            logger.exception("finding %s assignment email was not recorded", finding.id)
     return finding
 
 

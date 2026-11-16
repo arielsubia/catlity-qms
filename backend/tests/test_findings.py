@@ -91,7 +91,6 @@ def test_create_finding_starts_as_open(
             "severity": "high",
             "clause_reference": "7.1.5",
             "status": "closed",
-            "assignee_id": "someone-else",
             "audit_id": "other-audit",
         },
         headers=_auth(token),

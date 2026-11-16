@@ -37,3 +37,8 @@ output "table_arn" {
   description = "ARN of the notification history DynamoDB table"
   value       = aws_dynamodb_table.notifications.arn
 }
+
+output "delivery_function_name" {
+  description = "Lambda that writes SES delivery events onto the notification table"
+  value       = aws_lambda_function.delivery.function_name
+}

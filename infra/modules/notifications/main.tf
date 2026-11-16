@@ -4,6 +4,8 @@ locals {
   configuration_set_name = "${var.project_name}-${var.environment}-notifications"
   topic_name             = "${var.project_name}-${var.environment}-notification-events"
   table_name             = "${var.project_name}-${var.environment}-notifications"
+  delivery_function_name = "${var.project_name}-${var.environment}-notification-delivery"
+  delivery_role_name     = "${var.project_name}-${var.environment}-notification-delivery"
 }
 
 # --- Sandbox sender ---
@@ -128,4 +130,105 @@ resource "aws_dynamodb_table" "notifications" {
   tags = merge(var.tags, {
     Name = local.table_name
   })
+}
+
+# --- Delivery subscriber ---
+# The function is not in the VPC. It only updates DynamoDB, so it does not
+# need the NAT Gateway. SES already publishes to the topic above.
+
+data "archive_file" "delivery" {
+  type        = "zip"
+  source_file = "${path.module}/events/handler.py"
+  output_path = "${path.module}/events.zip"
+}
+
+data "aws_region" "current" {}
+
+data "aws_iam_policy_document" "delivery_assume" {
+  statement {
+    effect  = "Allow"
+    actions = ["sts:AssumeRole"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["lambda.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "delivery" {
+  name               = local.delivery_role_name
+  assume_role_policy = data.aws_iam_policy_document.delivery_assume.json
+
+  tags = merge(var.tags, {
+    Name = local.delivery_role_name
+  })
+}
+
+data "aws_iam_policy_document" "delivery" {
+  statement {
+    sid       = "UpdateNotificationStatus"
+    effect    = "Allow"
+    actions   = ["dynamodb:UpdateItem"]
+    resources = [aws_dynamodb_table.notifications.arn]
+  }
+
+  statement {
+    sid    = "WriteDeliveryLogs"
+    effect = "Allow"
+    actions = [
+      "logs:CreateLogGroup",
+      "logs:CreateLogStream",
+      "logs:PutLogEvents",
+    ]
+    resources = [
+      "arn:aws:logs:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/${local.delivery_function_name}",
+      "arn:aws:logs:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/${local.delivery_function_name}:*",
+    ]
+  }
+}
+
+resource "aws_iam_role_policy" "delivery" {
+  name   = "${local.delivery_role_name}-access"
+  role   = aws_iam_role.delivery.id
+  policy = data.aws_iam_policy_document.delivery.json
+}
+
+resource "aws_lambda_function" "delivery" {
+  function_name    = local.delivery_function_name
+  role             = aws_iam_role.delivery.arn
+  runtime          = "python3.12"
+  handler          = "handler.handler"
+  filename         = data.archive_file.delivery.output_path
+  source_code_hash = data.archive_file.delivery.output_base64sha256
+  timeout          = 10
+  memory_size      = 128
+
+  environment {
+    variables = {
+      NOTIFICATIONS_TABLE_NAME = aws_dynamodb_table.notifications.name
+    }
+  }
+
+  tags = merge(var.tags, {
+    Name = local.delivery_function_name
+  })
+
+  depends_on = [aws_iam_role_policy.delivery]
+}
+
+resource "aws_lambda_permission" "delivery" {
+  statement_id  = "AllowSnsInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.delivery.function_name
+  principal     = "sns.amazonaws.com"
+  source_arn    = aws_sns_topic.notification_events.arn
+}
+
+resource "aws_sns_topic_subscription" "delivery" {
+  topic_arn = aws_sns_topic.notification_events.arn
+  protocol  = "lambda"
+  endpoint  = aws_lambda_function.delivery.arn
+
+  depends_on = [aws_lambda_permission.delivery]
 }

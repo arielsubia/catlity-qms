@@ -167,3 +167,8 @@ output "notifications_table_arn" {
   description = "ARN of the notification history DynamoDB table"
   value       = module.notifications.table_arn
 }
+
+output "notifications_delivery_function_name" {
+  description = "Lambda subscribed to the SES notification topic"
+  value       = module.notifications.delivery_function_name
+}

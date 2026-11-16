@@ -13,6 +13,7 @@ from app.core.database import get_db
 from app.core.security import CurrentUser, get_current_user
 from app.models.corrective_action import CorrectiveAction
 from app.models.finding import Finding
+from app.models.user import User
 from app.schemas.corrective_action import (
     CorrectiveActionCreate,
     CorrectiveActionListResponse,
@@ -35,6 +36,25 @@ def _require_action_editor(
         status_code=status.HTTP_403_FORBIDDEN,
         detail="You cannot change corrective actions for this finding",
     )
+
+
+def _get_active_member(db: Session, tenant_id: str, user_id: str) -> User:
+    """Return an active user of this tenant, or 422 when the id does not match."""
+    member = (
+        db.query(User)
+        .filter(
+            User.id == user_id,
+            User.tenant_id == tenant_id,
+            User.is_active.is_(True),
+        )
+        .first()
+    )
+    if member is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Responsible user was not found in this tenant",
+        )
+    return member
 
 
 def _get_tenant_action(
@@ -71,10 +91,16 @@ def create_corrective_action(
     """Create a corrective action on a finding of the caller's tenant.
 
     A finding can hold several actions. The new row stays ``pending`` and
-    ``corrective``, with no responsible user.
+    ``corrective``. An optional ``responsible_id`` must be an active user of
+    the same tenant. The overdue reminder uses that user.
     """
     finding = _get_tenant_finding(db, finding_id, current_user.tenant_id)
     _require_action_editor(db, current_user, finding)
+    responsible = None
+    if action_in.responsible_id:
+        responsible = _get_active_member(
+            db, current_user.tenant_id, action_in.responsible_id
+        )
     action = CorrectiveAction(
         tenant_id=current_user.tenant_id,
         finding_id=finding_id,
@@ -82,6 +108,7 @@ def create_corrective_action(
         due_date=action_in.due_date,
         completion_date=action_in.completion_date,
         effectiveness=action_in.effectiveness,
+        responsible_id=responsible.id if responsible else None,
         action_type="corrective",
         status="pending",
     )

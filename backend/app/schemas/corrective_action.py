@@ -6,14 +6,16 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 class CorrectiveActionCreate(BaseModel):
     """Fields the client may set when recording a corrective action.
 
-    Status, action type, and the responsible user are not accepted here.
-    The API stores ``pending``, ``corrective``, and an empty responsible.
+    Status and action type are not accepted here. The API stores ``pending``
+    and ``corrective``. ``responsible_id`` is optional and must be an active
+    user of the same tenant. The overdue reminder uses that user.
     """
 
     description: str = Field(..., min_length=1)
     due_date: date | None = None
     completion_date: date | None = None
     effectiveness: str | None = Field(None, max_length=255)
+    responsible_id: str | None = Field(None, min_length=1, max_length=36)
 
 
 class CorrectiveActionUpdate(BaseModel):
