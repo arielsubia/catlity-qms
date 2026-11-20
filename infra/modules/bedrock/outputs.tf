@@ -57,3 +57,23 @@ output "report_harness_arn" {
   description = "ARN of the Report Generator harness"
   value       = aws_bedrockagentcore_harness.report.arn
 }
+
+output "onboarding_harness_id" {
+  description = "Id of the Onboarding Assistant harness"
+  value       = aws_bedrockagentcore_harness.onboarding.harness_id
+}
+
+output "onboarding_harness_arn" {
+  description = "ARN of the Onboarding Assistant harness"
+  value       = aws_bedrockagentcore_harness.onboarding.arn
+}
+
+output "onboarding_gateway_id" {
+  description = "Id of the onboarding action-group gateway"
+  value       = aws_bedrockagentcore_gateway.onboarding.gateway_id
+}
+
+output "onboarding_function_names" {
+  description = "Onboarding action Lambdas keyed by tool name"
+  value       = { for key, fn in aws_lambda_function.onboarding : key => fn.function_name }
+}

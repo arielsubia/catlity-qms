@@ -133,6 +133,26 @@ output "bedrock_report_harness_arn" {
   value       = module.bedrock.report_harness_arn
 }
 
+output "bedrock_onboarding_harness_id" {
+  description = "Id of the Onboarding Assistant harness"
+  value       = module.bedrock.onboarding_harness_id
+}
+
+output "bedrock_onboarding_harness_arn" {
+  description = "ARN of the Onboarding Assistant harness"
+  value       = module.bedrock.onboarding_harness_arn
+}
+
+output "bedrock_onboarding_gateway_id" {
+  description = "Id of the onboarding action-group gateway"
+  value       = module.bedrock.onboarding_gateway_id
+}
+
+output "bedrock_onboarding_function_names" {
+  description = "Onboarding action Lambdas keyed by tool name"
+  value       = module.bedrock.onboarding_function_names
+}
+
 output "notifications_sender_email" {
   description = "Sandbox SES sender. Verification stays pending until that inbox confirms the address."
   value       = module.notifications.sender_email

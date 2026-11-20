@@ -1,26 +1,50 @@
 data "aws_caller_identity" "current" {}
 
 locals {
-  kb_role_name          = "${var.project_name}-${var.environment}-bedrock-kb"
-  agent_role_name       = "${var.project_name}-${var.environment}-bedrock-agent"
-  vector_bucket         = "${var.project_name}-${var.environment}-vectors"
-  embedding_model       = "amazon.titan-embed-text-v2:0"
-  embedding_dims        = 1024
-  response_profile      = "us.amazon.nova-micro-v1:0"
-  harness_name          = "Normative_Advisor"
-  report_harness_name   = "Report_Generator"
-  report_role_name      = "${var.project_name}-${var.environment}-bedrock-report"
-  report_profile        = "us.amazon.nova-micro-v1:0"
+  kb_role_name        = "${var.project_name}-${var.environment}-bedrock-kb"
+  agent_role_name     = "${var.project_name}-${var.environment}-bedrock-agent"
+  vector_bucket       = "${var.project_name}-${var.environment}-vectors"
+  embedding_model     = "amazon.titan-embed-text-v2:0"
+  embedding_dims      = 1024
+  response_profile    = "us.amazon.nova-micro-v1:0"
+  harness_name        = "Normative_Advisor"
+  report_harness_name = "Report_Generator"
+  report_role_name    = "${var.project_name}-${var.environment}-bedrock-report"
+  report_profile      = "us.amazon.nova-micro-v1:0"
   # Literal ARN so this harness does not depend on the normative gateway
   # resource. A reference would pull the retrieve Lambda into the apply, and
   # the local zip hash does not match the published function.
-  report_gateway_arn    = "arn:aws:bedrock-agentcore:${var.aws_region}:${data.aws_caller_identity.current.account_id}:gateway/catlity-qms-dev-normative-gociabb2cb"
-  report_instruction    = "You are Report Generator for Catlity QMS. Write an audit report from the findings in the user message. Use these four headings, in this order: Resumen, Hallazgos, Conclusiones, Recomendaciones. If the findings are written in Spanish, write the report in Spanish. If they are written in English, write the report in English. Cite the file name of each study note you use, exactly as it appears in the passage. Do not translate file names. The notes are original study summaries in English. They are not the official text of ISO 9001, IATF 16949, or GMP. Do not invent clause numbers or requirements. If no passage covers a finding, say so in that finding and do not fill the gap from general knowledge. A Spanish finding can miss an English note. Treat a missing passage as no citation."
-  gateway_name          = "${var.project_name}-${var.environment}-normative"
-  gateway_role_name     = "${var.project_name}-${var.environment}-bedrock-gateway"
-  retrieve_role_name    = "${var.project_name}-${var.environment}-bedrock-retrieve"
-  retrieve_function     = "${var.project_name}-${var.environment}-normative-retrieve"
-  normative_instruction = "You are Normative Advisor for Catlity QMS. Answer only from the study notes returned by the study-notes retrieval tool. Cite the file name of each note you use. The notes are original study summaries. They are not the official text of ISO 9001, IATF 16949, or GMP. If the notes do not cover the question, say so. Do not invent clause numbers or requirements. Call the tool once per corpus. The corpus argument is common, automotive, or pharmaceutical. Use common for every question. Also use automotive or pharmaceutical only when the question names that industry."
+  report_gateway_arn           = "arn:aws:bedrock-agentcore:${var.aws_region}:${data.aws_caller_identity.current.account_id}:gateway/catlity-qms-dev-normative-gociabb2cb"
+  report_instruction           = "You are Report Generator for Catlity QMS. Write an audit report from the findings in the user message. Use these four headings, in this order: Resumen, Hallazgos, Conclusiones, Recomendaciones. If the findings are written in Spanish, write the report in Spanish. If they are written in English, write the report in English. Cite the file name of each study note you use, exactly as it appears in the passage. Do not translate file names. The notes are original study summaries in English. They are not the official text of ISO 9001, IATF 16949, or GMP. Do not invent clause numbers or requirements. If no passage covers a finding, say so in that finding and do not fill the gap from general knowledge. A Spanish finding can miss an English note. Treat a missing passage as no citation."
+  gateway_name                 = "${var.project_name}-${var.environment}-normative"
+  gateway_role_name            = "${var.project_name}-${var.environment}-bedrock-gateway"
+  retrieve_role_name           = "${var.project_name}-${var.environment}-bedrock-retrieve"
+  retrieve_function            = "${var.project_name}-${var.environment}-normative-retrieve"
+  onboarding_harness_name      = "Onboarding_Assistant"
+  onboarding_role_name         = "${var.project_name}-${var.environment}-bedrock-onboarding"
+  onboarding_profile           = "us.amazon.nova-micro-v1:0"
+  onboarding_gateway_name      = "${var.project_name}-${var.environment}-onboarding"
+  onboarding_gateway_role_name = "${var.project_name}-${var.environment}-bedrock-onboarding-gateway"
+  onboarding_lambda_role_name  = "${var.project_name}-${var.environment}-bedrock-onboarding-lambda"
+  onboarding_assign_role_name  = "${var.project_name}-${var.environment}-bedrock-onboarding-assign-kb"
+  # Applied knowledge base ids. Literals keep this harness from planning the
+  # knowledge bases, their data sources, or Normative_Advisor.
+  onboarding_kb_ids = {
+    common         = "OTQJ8TMBNI"
+    automotive     = "QWONN58E2H"
+    pharmaceutical = "DX3IVAFQ6K"
+  }
+  onboarding_instruction = <<-EOT
+  You are Onboarding Assistant for Catlity QMS. Guide one new organization, one step at a time, in the language the user writes. Ask only for the next missing fact. Do not skip a step and do not call a tool before its inputs are known.
+  Step 1. Ask for the organization name and the industry. The industry is automotive or pharmaceutical.
+  Step 2. Call create_tenant with that name and industry.
+  Step 3. Call assign_kb with that industry. This checks the existing common knowledge base and the knowledge base for that industry. Do not create a knowledge base.
+  Step 4. Call generate_checklists with that industry.
+  Step 5. Ask for the administrator full name and email, then call create_admin_user.
+  Step 6. Repeat the four tool results in a short summary and stop. Do not ask for a password.
+  If a tool returns an error, say what failed and ask only for the field to correct. Do not invent standards text, clause numbers, or a tenant id. These tools do not write to the database and do not create the sign-in user.
+  EOT
+  normative_instruction  = "You are Normative Advisor for Catlity QMS. Answer only from the study notes returned by the study-notes retrieval tool. Cite the file name of each note you use. The notes are original study summaries. They are not the official text of ISO 9001, IATF 16949, or GMP. If the notes do not cover the question, say so. Do not invent clause numbers or requirements. Call the tool once per corpus. The corpus argument is common, automotive, or pharmaceutical. Use common for every question. Also use automotive or pharmaceutical only when the question names that industry."
 
   corpora = {
     common = {
@@ -785,4 +809,456 @@ resource "aws_bedrockagentcore_harness" "report" {
   })
 
   depends_on = [aws_iam_role_policy.report]
+}
+
+# --- Onboarding Assistant ---
+# Third harness. Its gateway and Lambdas are new, so this apply does not
+# reference the normative gateway, the retrieve Lambda, or the knowledge bases.
+# devops-ariel can already create the harness and the gateway. lambda:CreateFunction
+# on these four names has to be added to catlity-qms-bedrock-deploy before apply.
+
+locals {
+  onboarding_tools = {
+    create_tenant = {
+      target_name        = "create-tenant"
+      description        = "Record the organization name and industry. Does not write to the database."
+      schema_description = "Organization name and industry"
+      properties = [
+        {
+          name        = "organization_name"
+          description = "Name of the organization that is registering."
+        },
+        {
+          name        = "industry"
+          description = "Industry of the organization: automotive or pharmaceutical."
+        },
+      ]
+    }
+    assign_kb = {
+      target_name        = "assign-kb"
+      description        = "Confirm the existing common knowledge base and the one for the industry. Does not create a knowledge base."
+      schema_description = "Industry whose knowledge bases should be confirmed"
+      properties = [
+        {
+          name        = "industry"
+          description = "Industry of the organization: automotive or pharmaceutical."
+        },
+      ]
+    }
+    generate_checklists = {
+      target_name        = "generate-checklists"
+      description        = "Return the starter checklist for the industry. Does not write to the database."
+      schema_description = "Industry whose starter checklist should be returned"
+      properties = [
+        {
+          name        = "industry"
+          description = "Industry of the organization: automotive or pharmaceutical."
+        },
+      ]
+    }
+    create_admin_user = {
+      target_name        = "create-admin-user"
+      description        = "Record the first administrator name and email. Does not create a Cognito user."
+      schema_description = "Administrator name and email"
+      properties = [
+        {
+          name        = "full_name"
+          description = "Full name of the first administrator."
+        },
+        {
+          name        = "email"
+          description = "Email address of the first administrator."
+        },
+      ]
+    }
+  }
+
+  onboarding_function_names = {
+    for key, tool in local.onboarding_tools :
+    key => "${var.project_name}-${var.environment}-onboarding-${tool.target_name}"
+  }
+}
+
+data "archive_file" "onboarding" {
+  for_each = local.onboarding_tools
+
+  type        = "zip"
+  source_file = "${path.module}/onboarding/${each.key}.py"
+  output_path = "${path.module}/onboarding/${each.key}.zip"
+}
+
+resource "aws_iam_role" "onboarding_lambda" {
+  name               = local.onboarding_lambda_role_name
+  assume_role_policy = data.aws_iam_policy_document.retrieve_assume.json
+
+  tags = merge(var.tags, {
+    Name = local.onboarding_lambda_role_name
+  })
+}
+
+data "aws_iam_policy_document" "onboarding_lambda" {
+  statement {
+    sid    = "WriteOnboardingLogs"
+    effect = "Allow"
+    actions = [
+      "logs:CreateLogGroup",
+      "logs:CreateLogStream",
+      "logs:PutLogEvents",
+    ]
+    resources = flatten([
+      for key, name in local.onboarding_function_names : [
+        "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/${name}",
+        "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/${name}:*",
+      ] if key != "assign_kb"
+    ])
+  }
+}
+
+resource "aws_iam_role_policy" "onboarding_lambda" {
+  name   = "${local.onboarding_lambda_role_name}-access"
+  role   = aws_iam_role.onboarding_lambda.id
+  policy = data.aws_iam_policy_document.onboarding_lambda.json
+}
+
+resource "aws_iam_role" "onboarding_assign_kb" {
+  name               = local.onboarding_assign_role_name
+  assume_role_policy = data.aws_iam_policy_document.retrieve_assume.json
+
+  tags = merge(var.tags, {
+    Name = local.onboarding_assign_role_name
+  })
+}
+
+data "aws_iam_policy_document" "onboarding_assign_kb" {
+  statement {
+    sid    = "ReadExistingKnowledgeBases"
+    effect = "Allow"
+    actions = [
+      "bedrock:GetKnowledgeBase",
+    ]
+    resources = [
+      for id in values(local.onboarding_kb_ids) :
+      "arn:aws:bedrock:${var.aws_region}:${data.aws_caller_identity.current.account_id}:knowledge-base/${id}"
+    ]
+  }
+
+  statement {
+    sid    = "WriteAssignLogs"
+    effect = "Allow"
+    actions = [
+      "logs:CreateLogGroup",
+      "logs:CreateLogStream",
+      "logs:PutLogEvents",
+    ]
+    resources = [
+      "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/${local.onboarding_function_names["assign_kb"]}",
+      "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/${local.onboarding_function_names["assign_kb"]}:*",
+    ]
+  }
+}
+
+resource "aws_iam_role_policy" "onboarding_assign_kb" {
+  name   = "${local.onboarding_assign_role_name}-access"
+  role   = aws_iam_role.onboarding_assign_kb.id
+  policy = data.aws_iam_policy_document.onboarding_assign_kb.json
+}
+
+resource "aws_lambda_function" "onboarding" {
+  for_each = local.onboarding_tools
+
+  function_name    = local.onboarding_function_names[each.key]
+  role             = each.key == "assign_kb" ? aws_iam_role.onboarding_assign_kb.arn : aws_iam_role.onboarding_lambda.arn
+  runtime          = "python3.12"
+  handler          = "${each.key}.handler"
+  filename         = data.archive_file.onboarding[each.key].output_path
+  source_code_hash = data.archive_file.onboarding[each.key].output_base64sha256
+  timeout          = 10
+  memory_size      = 128
+
+  dynamic "environment" {
+    for_each = each.key == "assign_kb" ? [1] : []
+
+    content {
+      variables = {
+        KB_COMMON         = local.onboarding_kb_ids.common
+        KB_AUTOMOTIVE     = local.onboarding_kb_ids.automotive
+        KB_PHARMACEUTICAL = local.onboarding_kb_ids.pharmaceutical
+      }
+    }
+  }
+
+  tags = merge(var.tags, {
+    Name = local.onboarding_function_names[each.key]
+  })
+
+  depends_on = [
+    aws_iam_role_policy.onboarding_lambda,
+    aws_iam_role_policy.onboarding_assign_kb,
+  ]
+}
+
+resource "aws_iam_role" "onboarding_gateway" {
+  name               = local.onboarding_gateway_role_name
+  assume_role_policy = data.aws_iam_policy_document.gateway_assume.json
+
+  tags = merge(var.tags, {
+    Name = local.onboarding_gateway_role_name
+  })
+}
+
+data "aws_iam_policy_document" "onboarding_gateway" {
+  statement {
+    sid       = "InvokeOnboardingFunctions"
+    effect    = "Allow"
+    actions   = ["lambda:InvokeFunction"]
+    resources = [for fn in aws_lambda_function.onboarding : fn.arn]
+  }
+}
+
+resource "aws_iam_role_policy" "onboarding_gateway" {
+  name   = "${local.onboarding_gateway_role_name}-access"
+  role   = aws_iam_role.onboarding_gateway.id
+  policy = data.aws_iam_policy_document.onboarding_gateway.json
+}
+
+resource "aws_bedrockagentcore_gateway" "onboarding" {
+  name            = local.onboarding_gateway_name
+  role_arn        = aws_iam_role.onboarding_gateway.arn
+  authorizer_type = "AWS_IAM"
+  protocol_type   = "MCP"
+  description     = "Onboarding actions for Onboarding Assistant"
+
+  tags = merge(var.tags, {
+    Name = local.onboarding_gateway_name
+  })
+
+  depends_on = [aws_iam_role_policy.onboarding_gateway]
+}
+
+# aws_bedrockagentcore_gateway_target has no tags argument. common_tags stay
+# on the gateway, the Lambdas, the roles, and the harness.
+resource "aws_bedrockagentcore_gateway_target" "onboarding" {
+  for_each = local.onboarding_tools
+
+  name               = each.value.target_name
+  gateway_identifier = aws_bedrockagentcore_gateway.onboarding.gateway_id
+  description        = each.value.description
+
+  credential_provider_configuration {
+    gateway_iam_role {}
+  }
+
+  target_configuration {
+    mcp {
+      lambda {
+        lambda_arn = aws_lambda_function.onboarding[each.key].arn
+
+        tool_schema {
+          inline_payload {
+            name        = each.key
+            description = each.value.description
+
+            input_schema {
+              type        = "object"
+              description = each.value.schema_description
+
+              dynamic "property" {
+                for_each = each.value.properties
+
+                content {
+                  name        = property.value.name
+                  type        = "string"
+                  description = property.value.description
+                  required    = true
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+resource "aws_iam_role" "onboarding" {
+  name               = local.onboarding_role_name
+  assume_role_policy = data.aws_iam_policy_document.agent_assume.json
+
+  tags = merge(var.tags, {
+    Name = local.onboarding_role_name
+  })
+}
+
+data "aws_iam_policy_document" "onboarding" {
+  statement {
+    sid    = "InvokeResponseModel"
+    effect = "Allow"
+    actions = [
+      "bedrock:InvokeModel",
+      "bedrock:InvokeModelWithResponseStream",
+    ]
+    resources = [
+      "arn:aws:bedrock:*::foundation-model/amazon.nova-micro-v1:0",
+      "arn:aws:bedrock:${var.aws_region}:${data.aws_caller_identity.current.account_id}:inference-profile/${local.onboarding_profile}",
+    ]
+  }
+
+  statement {
+    sid       = "ReadInferenceProfile"
+    effect    = "Allow"
+    actions   = ["bedrock:GetInferenceProfile"]
+    resources = ["arn:aws:bedrock:${var.aws_region}:${data.aws_caller_identity.current.account_id}:inference-profile/${local.onboarding_profile}"]
+  }
+
+  statement {
+    sid       = "InvokeOnboardingGateway"
+    effect    = "Allow"
+    actions   = ["bedrock-agentcore:InvokeGateway"]
+    resources = [aws_bedrockagentcore_gateway.onboarding.gateway_arn]
+  }
+
+  statement {
+    sid       = "PullManagedHarnessImage"
+    effect    = "Allow"
+    actions   = ["ecr-public:GetAuthorizationToken"]
+    resources = ["*"]
+  }
+
+  statement {
+    sid       = "BearerTokenForPublicEcr"
+    effect    = "Allow"
+    actions   = ["sts:GetServiceBearerToken"]
+    resources = ["*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "sts:AWSServiceName"
+      values   = ["ecr-public.amazonaws.com"]
+    }
+  }
+
+  statement {
+    sid    = "WriteHarnessLogs"
+    effect = "Allow"
+    actions = [
+      "logs:CreateLogGroup",
+      "logs:DescribeLogStreams",
+    ]
+    resources = ["arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/bedrock-agentcore/runtimes/*"]
+  }
+
+  statement {
+    sid       = "DescribeHarnessLogGroups"
+    effect    = "Allow"
+    actions   = ["logs:DescribeLogGroups"]
+    resources = ["arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:*"]
+  }
+
+  statement {
+    sid    = "WriteHarnessLogStreams"
+    effect = "Allow"
+    actions = [
+      "logs:CreateLogStream",
+      "logs:PutLogEvents",
+    ]
+    resources = ["arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/bedrock-agentcore/runtimes/*:log-stream:*"]
+  }
+
+  statement {
+    sid       = "AllowHarnessLogDelivery"
+    effect    = "Allow"
+    actions   = ["logs:PutResourcePolicy"]
+    resources = ["*"]
+  }
+
+  statement {
+    sid       = "PublishHarnessMetrics"
+    effect    = "Allow"
+    actions   = ["cloudwatch:PutMetricData"]
+    resources = ["*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "cloudwatch:namespace"
+      values   = ["bedrock-agentcore"]
+    }
+  }
+
+  statement {
+    sid    = "TraceHarnessSessions"
+    effect = "Allow"
+    actions = [
+      "xray:PutTraceSegments",
+      "xray:PutTelemetryRecords",
+      "xray:GetSamplingRules",
+      "xray:GetSamplingTargets",
+    ]
+    resources = ["*"]
+  }
+
+  statement {
+    sid    = "GetHarnessWorkloadToken"
+    effect = "Allow"
+    actions = [
+      "bedrock-agentcore:GetWorkloadAccessToken",
+      "bedrock-agentcore:GetWorkloadAccessTokenForJWT",
+    ]
+    resources = [
+      "arn:aws:bedrock-agentcore:${var.aws_region}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default",
+      "arn:aws:bedrock-agentcore:${var.aws_region}:${data.aws_caller_identity.current.account_id}:workload-identity-directory/default/workload-identity/harness_${local.onboarding_harness_name}-*",
+    ]
+  }
+}
+
+resource "aws_iam_role_policy" "onboarding" {
+  name   = "${local.onboarding_role_name}-access"
+  role   = aws_iam_role.onboarding.id
+  policy = data.aws_iam_policy_document.onboarding.json
+}
+
+resource "aws_bedrockagentcore_harness" "onboarding" {
+  harness_name       = local.onboarding_harness_name
+  execution_role_arn = aws_iam_role.onboarding.arn
+  allowed_tools      = ["*"]
+  max_iterations     = 6
+  timeout_seconds    = 60
+
+  model {
+    bedrock_model_config {
+      model_id    = local.onboarding_profile
+      temperature = 0
+    }
+  }
+
+  system_prompt {
+    text = local.onboarding_instruction
+  }
+
+  memory {
+    disabled {}
+  }
+
+  tool {
+    type = "agentcore_gateway"
+    name = "onboarding"
+
+    config {
+      agentcore_gateway {
+        gateway_arn = aws_bedrockagentcore_gateway.onboarding.gateway_arn
+
+        outbound_auth {
+          aws_iam = true
+        }
+      }
+    }
+  }
+
+  tags = merge(var.tags, {
+    Name = local.onboarding_harness_name
+  })
+
+  depends_on = [
+    aws_iam_role_policy.onboarding,
+    aws_bedrockagentcore_gateway_target.onboarding,
+  ]
 }
