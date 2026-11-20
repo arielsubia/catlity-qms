@@ -41,14 +41,15 @@ const readIdToken = async (): Promise<string> => {
   return token
 }
 
-export const apiRequest = async <T>(path: string, init: RequestInit = {}): Promise<T> => {
-  const token = await readIdToken()
+const withJsonContentType = (init: RequestInit): Headers => {
   const headers = new Headers(init.headers)
-  headers.set('Authorization', `Bearer ${token}`)
   if (init.body !== undefined && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json')
   }
+  return headers
+}
 
+const request = async <T>(path: string, init: RequestInit, headers: Headers): Promise<T> => {
   let response: Response
   try {
     response = await fetch(`${appConfig.apiBaseUrl}${path}`, { ...init, headers })
@@ -61,4 +62,14 @@ export const apiRequest = async <T>(path: string, init: RequestInit = {}): Promi
   }
 
   return (await response.json()) as T
+}
+
+export const publicApiRequest = async <T>(path: string, init: RequestInit = {}): Promise<T> =>
+  request(path, init, withJsonContentType(init))
+
+export const apiRequest = async <T>(path: string, init: RequestInit = {}): Promise<T> => {
+  const token = await readIdToken()
+  const headers = withJsonContentType(init)
+  headers.set('Authorization', `Bearer ${token}`)
+  return request(path, init, headers)
 }

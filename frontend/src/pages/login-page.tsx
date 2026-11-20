@@ -1,7 +1,8 @@
 import { Alert, Button, Card, Form, Input, Typography } from 'antd'
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 
+import { isOnboardingLoginState } from '../api/onboarding-api'
 import { AuthServiceError } from '../auth/auth-service'
 import { useAuth } from '../auth/use-auth'
 import { isAuthConfigured } from '../config/env'
@@ -14,6 +15,8 @@ interface LoginFormValues {
 export const LoginPage = () => {
   const { signIn } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
+  const created = isOnboardingLoginState(location.state) ? location.state : null
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
@@ -40,8 +43,24 @@ export const LoginPage = () => {
           title="Cognito is not configured. Set the variables in frontend/.env.local."
         />
       )}
+      {created && (
+        <Alert
+          type="info"
+          showIcon
+          className="auth-alert"
+          title={
+            `Your organization is registered. ${created.fullName} (${created.email}) ` +
+            'cannot sign in yet: this account has no password.'
+          }
+        />
+      )}
       {error && <Alert type="error" showIcon className="auth-alert" title={error} />}
-      <Form<LoginFormValues> layout="vertical" onFinish={handleFinish} requiredMark={false}>
+      <Form<LoginFormValues>
+        layout="vertical"
+        onFinish={handleFinish}
+        requiredMark={false}
+        initialValues={{ email: created?.email ?? '' }}
+      >
         <Form.Item
           label="Email"
           name="email"
@@ -67,6 +86,12 @@ export const LoginPage = () => {
         No account yet?{' '}
         <Button type="link" onClick={() => navigate('/register')}>
           Create one
+        </Button>
+      </Typography.Paragraph>
+      <Typography.Paragraph className="auth-switch">
+        New organization?{' '}
+        <Button type="link" onClick={() => navigate('/onboarding')}>
+          Register your organization
         </Button>
       </Typography.Paragraph>
     </Card>

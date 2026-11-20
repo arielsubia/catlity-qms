@@ -4,6 +4,7 @@ import { AppLayout } from '../layout/app-layout'
 import { NAV_ITEMS } from '../layout/nav-items'
 import { PublicLayout } from '../layout/public-layout'
 import { LoginPage } from '../pages/login-page'
+import { OnboardingPage } from '../pages/onboarding-page'
 import { RegisterPage } from '../pages/register-page'
 import { AiAgentPage } from '../pages/ai-agent-page'
 import { AuditsPage } from '../pages/audits-page'
@@ -31,6 +32,7 @@ export const AppRoutes = () => (
       <Route element={<PublicLayout />}>
         <Route path="login" element={<LoginPage />} />
         <Route path="register" element={<RegisterPage />} />
+        <Route path="onboarding" element={<OnboardingPage />} />
       </Route>
     </Route>
     <Route element={<RequireAuth />}>

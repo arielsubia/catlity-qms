@@ -11,14 +11,18 @@ vi.mock('../config/env', () => ({
   isAuthConfigured: () => true,
 }))
 
-const renderLogin = (signIn: AuthContextValue['signIn']) => {
+const renderLogin = (
+  signIn: AuthContextValue['signIn'],
+  state?: { fullName: string; email: string },
+) => {
   const value: AuthContextValue = { user: null, signIn, signOut: vi.fn() }
   render(
     <AuthContext.Provider value={value}>
-      <MemoryRouter initialEntries={['/login']}>
+      <MemoryRouter initialEntries={[{ pathname: '/login', state }]}>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<h1>Create your account</h1>} />
+          <Route path="/onboarding" element={<h1>Register your organization</h1>} />
           <Route path="/dashboard" element={<h1>Dashboard</h1>} />
         </Routes>
       </MemoryRouter>
@@ -68,5 +72,24 @@ describe('LoginPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Create one' }))
 
     expect(screen.getByRole('heading', { name: 'Create your account' })).toBeInTheDocument()
+  })
+
+  it('opens organization registration from the sign-in form', async () => {
+    renderLogin(vi.fn())
+
+    await userEvent.click(screen.getByRole('button', { name: 'Register your organization' }))
+
+    expect(screen.getByRole('heading', { name: 'Register your organization' })).toBeInTheDocument()
+  })
+
+  it('shows the created administrator and fills the email', () => {
+    renderLogin(vi.fn(), { fullName: 'Ada Lovelace', email: 'ada@north.example' })
+
+    expect(
+      screen.getByText(
+        'Your organization is registered. Ada Lovelace (ada@north.example) cannot sign in yet: this account has no password.',
+      ),
+    ).toBeInTheDocument()
+    expect(screen.getByLabelText('Email')).toHaveValue('ada@north.example')
   })
 })
