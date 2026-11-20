@@ -2,8 +2,9 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { MemoryRouter } from 'react-router-dom'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { startOnboarding } from '../api/onboarding-api'
 import { AuthContext, type AuthContextValue } from '../auth/auth-context'
 import type { SessionUser } from '../auth/auth-service'
 import { NAV_ITEMS } from '../layout/nav-items'
@@ -29,6 +30,16 @@ vi.mock('../api/findings-api', () => ({
 vi.mock('../api/normative-api', () => ({
   queryNormative: vi.fn(),
 }))
+
+vi.mock('../api/onboarding-api', async () => {
+  const actual =
+    await vi.importActual<typeof import('../api/onboarding-api')>('../api/onboarding-api')
+  return {
+    ...actual,
+    startOnboarding: vi.fn(),
+    sendOnboardingMessage: vi.fn(),
+  }
+})
 
 vi.mock('../api/notifications-api', () => ({
   listNotifications: vi.fn().mockResolvedValue({ items: [], unread_count: 0 }),
@@ -87,6 +98,19 @@ const AuthHarness = ({
 }
 
 describe('AppRoutes', () => {
+  beforeEach(() => {
+    vi.mocked(startOnboarding).mockResolvedValue({
+      session_id: 'session-1',
+      reply: 'Send the organization name and the industry, separated by a comma.',
+      industry_selected: false,
+      kb_assigned: false,
+      checklists_created: false,
+      admin_created: false,
+      knowledge_base_ids: null,
+      tenant_id: null,
+    })
+  })
+
   it.each(NAV_ITEMS.map((item) => item.path))(
     'sends %s to login when there is no session',
     (path) => {
@@ -155,6 +179,25 @@ describe('AppRoutes', () => {
   it.each(['/', '/missing'])('sends %s to the dashboard with a session', (path) => {
     renderRoutes(path, signedInUser)
     expect(screen.getByRole('heading', { level: 2, name: 'Dashboard' })).toBeInTheDocument()
+  })
+
+  it('opens onboarding outside the authenticated layout', async () => {
+    renderRoutes('/onboarding', null)
+
+    expect(
+      await screen.findByRole('heading', { level: 2, name: 'Register your organization' }),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Catlity QMS' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Sign out' })).not.toBeInTheDocument()
+  })
+
+  it('sends a signed-in user from /onboarding to the dashboard', () => {
+    renderRoutes('/onboarding', signedInUser)
+
+    expect(screen.getByRole('heading', { level: 2, name: 'Dashboard' })).toBeInTheDocument()
+    expect(
+      screen.queryByRole('heading', { level: 2, name: 'Register your organization' }),
+    ).not.toBeInTheDocument()
   })
 
   it.each(['/login', '/register'])('sends a signed-in user from %s to the dashboard', (path) => {

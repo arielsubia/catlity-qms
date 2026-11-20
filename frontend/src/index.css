@@ -1,10 +1,77 @@
 body {
   margin: 0;
   background: #fff;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.presentation-frame {
+  display: flex;
+  flex-direction: column;
+  min-height: 100svh;
+}
+
+.presentation-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 20px;
+  padding: 10px 20px;
+  background: #1677ff;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.presentation-banner p {
+  margin: 0;
+}
+
+.presentation-banner-mark,
+.presentation-banner-credit {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.presentation-banner-teclab {
+  height: 40px;
+  width: auto;
+  padding: 3px;
+  background: #fff;
+  border-radius: 6px;
+}
+
+.presentation-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.phil-credit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: #5c5c6b;
+  color: #f5f5f7;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.presentation-banner-credit img,
+.phil-credit img {
+  display: block;
+  width: 22px;
+  height: 22px;
 }
 
 .app-shell {
-  min-height: 100svh;
+  flex: 1;
+  min-height: 0;
   padding: 24px;
   box-sizing: border-box;
 }
@@ -12,6 +79,14 @@ body {
 .auth-card {
   width: 100%;
   max-width: 400px;
+}
+
+.onboarding-card {
+  width: min(720px, calc(100vw - 48px));
+}
+
+.onboarding-steps {
+  margin-bottom: 16px;
 }
 
 .auth-alert {
@@ -24,7 +99,8 @@ body {
 }
 
 .app-layout {
-  min-height: 100svh;
+  flex: 1;
+  min-height: 0;
 }
 
 .app-body {

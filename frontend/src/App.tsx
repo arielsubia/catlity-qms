@@ -1,10 +1,13 @@
 import { BrowserRouter } from 'react-router-dom'
 
+import { PresentationFrame } from './layout/presentation-frame'
 import { AppRoutes } from './routing/app-routes'
 
 const App = () => (
   <BrowserRouter>
-    <AppRoutes />
+    <PresentationFrame>
+      <AppRoutes />
+    </PresentationFrame>
   </BrowserRouter>
 )
 
