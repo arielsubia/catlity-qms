@@ -37,7 +37,7 @@ The platform is composed of:
 | AI Agents | Amazon Bedrock + Knowledge Bases |
 | Dashboard | Amazon QuickSight |
 | IaC | Terraform |
-| CI/CD | GitHub Actions (`ci.yml` on every push and pull request) |
+| CI/CD | GitHub Actions (`ci.yml` on pull requests and on pushes to `main`) |
 | Cost Monitoring | AWS Cost Explorer. AWS Budgets is defined and not applied |
 
 ## Repository Structure
@@ -76,7 +76,7 @@ catlity-qms/
 
 ![CI pipeline](docs/diagrams/ci-pipeline-flow.png)
 
-GitHub Actions workflow `ci.yml` runs on every push and every pull request. One job on a GitHub-hosted `ubuntu-latest` runner lints with ruff and eslint, tests with pytest and vitest, and builds the backend Docker image and the Vite bundle. A failure in lint or tests stops the job, so the workflow fails. The image is not pushed to a registry.
+GitHub Actions workflow `ci.yml` runs on every pull request and on every push to `main`, including the merge. A push to a feature branch that already has a pull request runs once, through the pull request event. One job on a GitHub-hosted `ubuntu-latest` runner lints with ruff and eslint, tests with pytest and vitest, and builds the backend Docker image and the Vite bundle. A failure in lint or tests stops the job, so the workflow fails. The image is not pushed to a registry.
 
 Tests that import the AWS SDK receive dummy credentials (`AWS_ACCESS_KEY_ID=testing`, `AWS_SECRET_ACCESS_KEY=testing`, `AWS_DEFAULT_REGION=us-east-1`) and `AWS_EC2_METADATA_DISABLED=true`, so boto3 does not call AWS. The workflow token is limited to `contents: read`. There is no repository secret, no OIDC role, and no call into account `265751834002`.
 
