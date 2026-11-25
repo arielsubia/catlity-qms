@@ -11,6 +11,7 @@ from app.api.v1.health import router as health_router
 from app.api.v1.normative import router as normative_router
 from app.api.v1.notifications import router as notifications_router
 from app.api.v1.onboarding import router as onboarding_router
+from app.api.v1.quicksight import router as quicksight_router
 from app.api.v1.reports import router as reports_router
 from app.api.v1.tenants import router as tenants_router
 
@@ -26,5 +27,6 @@ api_router.include_router(corrective_actions_router)
 api_router.include_router(evidence_router)
 api_router.include_router(notifications_router)
 api_router.include_router(onboarding_router)
+api_router.include_router(quicksight_router)
 api_router.include_router(normative_router)
 api_router.include_router(reports_router)

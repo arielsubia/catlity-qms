@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { startOnboarding } from '../api/onboarding-api'
+import { getEmbedUrl } from '../api/quicksight-api'
 import { AuthContext, type AuthContextValue } from '../auth/auth-context'
 import type { SessionUser } from '../auth/auth-service'
 import { NAV_ITEMS } from '../layout/nav-items'
@@ -40,6 +41,10 @@ vi.mock('../api/onboarding-api', async () => {
     sendOnboardingMessage: vi.fn(),
   }
 })
+
+vi.mock('../api/quicksight-api', () => ({
+  getEmbedUrl: vi.fn(),
+}))
 
 vi.mock('../api/notifications-api', () => ({
   listNotifications: vi.fn().mockResolvedValue({ items: [], unread_count: 0 }),
@@ -130,6 +135,21 @@ describe('AppRoutes', () => {
 
     expect(screen.getByRole('heading', { level: 2, name: label })).toBeInTheDocument()
     expect(screen.getByText('This section is not available yet.')).toBeInTheDocument()
+  })
+
+  it('shows the dashboard iframe for an admin', async () => {
+    vi.mocked(getEmbedUrl).mockResolvedValue({
+      embed_url: 'https://quicksight.aws.example/embed/one',
+      expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+    })
+
+    renderRoutes('/dashboard', { ...signedInUser, role: 'admin' })
+
+    expect(await screen.findByTitle('Compliance dashboard')).toHaveAttribute(
+      'src',
+      'https://quicksight.aws.example/embed/one',
+    )
+    expect(screen.queryByText('This section is not available yet.')).not.toBeInTheDocument()
   })
 
   it('renders the audits screen for a signed-in user', async () => {

@@ -1,3 +1,5 @@
+import { canViewDashboard } from '../dashboard/permissions'
+
 export const NAV_ITEMS = [
   { key: 'dashboard', label: 'Dashboard', path: '/dashboard' },
   { key: 'audits', label: 'Audits', path: '/audits' },
@@ -6,3 +8,6 @@ export const NAV_ITEMS = [
   { key: 'ai-agent', label: 'AI Agent', path: '/ai-agent' },
   { key: 'settings', label: 'Settings', path: '/settings' },
 ] as const
+
+export const visibleNavItems = (role: string) =>
+  NAV_ITEMS.filter((item) => item.path !== '/dashboard' || canViewDashboard(role))

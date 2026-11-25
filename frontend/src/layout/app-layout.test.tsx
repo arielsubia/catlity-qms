@@ -47,8 +47,9 @@ const installMatchMedia = (matches: (query: string) => boolean) => {
 const renderLayout = async (
   signOut: AuthContextValue['signOut'] = vi.fn(),
   path = '/dashboard',
+  role = 'auditor',
 ) => {
-  const value: AuthContextValue = { user, signIn: vi.fn(), signOut }
+  const value: AuthContextValue = { user: { ...user, role }, signIn: vi.fn(), signOut }
   const router = createMemoryRouter(
     [
       {
@@ -85,12 +86,20 @@ describe('AppLayout', () => {
   it('lists the main sections and the open findings total', async () => {
     await renderLayout()
 
-    for (const item of NAV_ITEMS) {
+    expect(screen.queryByRole('menuitem', { name: 'Dashboard' })).not.toBeInTheDocument()
+    for (const item of NAV_ITEMS.filter((entry) => entry.path !== '/dashboard')) {
       const name = item.path === '/findings' ? /Findings/ : item.label
       expect(screen.getByRole('menuitem', { name })).toBeInTheDocument()
       expect(screen.getByRole('link', { name })).toHaveAttribute('href', item.path)
     }
     expect(listFindings).toHaveBeenCalledWith({ skip: 0, limit: 1, status: 'open' })
+  })
+
+  it.each(['admin', 'qa_manager'])('shows Dashboard for %s', async (role) => {
+    await renderLayout(vi.fn(), '/audits', role)
+
+    expect(screen.getByRole('menuitem', { name: 'Dashboard' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveAttribute('href', '/dashboard')
   })
 
   it('shows the signed-in user in the header', async () => {

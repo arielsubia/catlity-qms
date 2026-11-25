@@ -43,6 +43,12 @@ class Settings(BaseSettings):
     corrective_action_overdue_template: str = "corrective-action-overdue"
     app_public_url: str = "http://localhost:5173"
 
+    # QuickSight. The dashboard is defined and not applied. Embedding uses a
+    # registered Reader, so the session-capacity pack is not required.
+    quicksight_aws_account_id: str = "265751834002"
+    quicksight_dashboard_id: str = "catlity-qms-dev-kpis"
+    quicksight_namespace: str = "default"
+
     @property
     def cognito_issuer(self) -> str:
         """OpenID Connect issuer URL for the configured user pool."""
