@@ -212,3 +212,8 @@ output "quicksight_refresh_schedule_id" {
   description = "Daily full refresh of the compliance dataset"
   value       = module.quicksight.refresh_schedule_id
 }
+
+output "quicksight_dashboard_id" {
+  description = "QuickSight dashboard of compliance KPIs"
+  value       = module.quicksight.dashboard_id
+}
