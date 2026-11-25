@@ -31,8 +31,8 @@ locals {
 }
 
 # aws_quicksight_account_subscription has no tags argument. common_tags stay
-# on the VPC connection, the data source, both datasets, the role, and the
-# security groups. The IAM user who applies this resource becomes the
+# on the VPC connection, the data source, both datasets, the dashboard, the
+# role, and the security groups. The IAM user who applies this resource becomes the
 # QuickSight admin. devops-ariel has no console sign-in, so this apply is run
 # later with the console IAM user. Readers are invited in the console and are
 # not created here.

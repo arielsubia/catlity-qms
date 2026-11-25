@@ -27,3 +27,13 @@ output "refresh_schedule_id" {
   description = "Daily full refresh of the compliance dataset"
   value       = aws_quicksight_refresh_schedule.compliance.schedule_id
 }
+
+output "dashboard_id" {
+  description = "QuickSight dashboard of compliance KPIs"
+  value       = aws_quicksight_dashboard.kpis.dashboard_id
+}
+
+output "dashboard_arn" {
+  description = "ARN of the compliance KPI dashboard"
+  value       = aws_quicksight_dashboard.kpis.arn
+}
