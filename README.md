@@ -1,5 +1,7 @@
 # Catlity QMS
 
+[![CI](https://github.com/arielsubia/catlity-qms/actions/workflows/ci.yml/badge.svg)](https://github.com/arielsubia/catlity-qms/actions/workflows/ci.yml)
+
 Multi-tenant SaaS platform for quality management and auditing, powered by specialized AI agents that understand industry-specific regulatory standards.
 
 The MVP targets the quality industry (ISO 9001) with built-in extensibility for additional industries (aeronautica, food, etc.).
@@ -35,7 +37,7 @@ The platform is composed of:
 | AI Agents | Amazon Bedrock + Knowledge Bases |
 | Dashboard | Amazon QuickSight |
 | IaC | Terraform |
-| CI/CD | GitHub Actions (no workflow committed yet) |
+| CI/CD | GitHub Actions (`ci.yml` on pull requests and on pushes to `main`) |
 | Cost Monitoring | AWS Cost Explorer. AWS Budgets is defined and not applied |
 
 ## Repository Structure
@@ -65,10 +67,22 @@ catlity-qms/
 │   ├── common/              # ISO 9001
 │   ├── automotive/          # IATF 16949
 │   └── pharmaceutical/      # GMP
-├── .github/workflows/       # reserved for CI workflows
+├── .github/workflows/       # ci.yml: lint, test, and build
 ├── .gitignore
 └── README.md
 ```
+
+## Continuous integration
+
+![CI pipeline](docs/diagrams/ci-pipeline-flow.png)
+
+GitHub Actions workflow `ci.yml` runs on every pull request and on every push to `main`, including the merge. A push to a feature branch that already has a pull request runs once, through the pull request event. One job on a GitHub-hosted `ubuntu-latest` runner lints with ruff and eslint, tests with pytest and vitest, and builds the backend Docker image and the Vite bundle. A failure in lint or tests stops the job, so the workflow fails. The image is not pushed to a registry.
+
+Tests that import the AWS SDK receive dummy credentials (`AWS_ACCESS_KEY_ID=testing`, `AWS_SECRET_ACCESS_KEY=testing`, `AWS_DEFAULT_REGION=us-east-1`) and `AWS_EC2_METADATA_DISABLED=true`, so boto3 does not call AWS. The workflow token is limited to `contents: read`. There is no repository secret, no OIDC role, and no call into account `265751834002`.
+
+This adds no AWS resource. Monthly cost on AWS is **$0**. A private repository includes 2,000 GitHub Actions minutes per month on the Free plan, and this job uses a few minutes per push. A public repository does not bill standard runners. On Azure the same check is a pipeline with read access to the repo. On Google Cloud it is Cloud Build with read access to the source. Neither is used here.
+
+The same commands run locally: `ruff check .` and `pytest tests/ -v` from `backend/`, and `npm run lint`, `npm test`, and `npm run build` from `frontend/`. `docker build -t catlity-qms-api:ci .` from `backend/` builds the image and does not push it. After `ci.yml` is on `main`, the badge at the top of this file shows the latest run. The diagram source is `docs/diagrams/ci-pipeline-flow.drawio`.
 
 ## Local Development Setup
 
