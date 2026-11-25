@@ -101,12 +101,12 @@ describe('AuditsPage', () => {
   it('lists name, status, auditor id, date, and actions', async () => {
     renderPage('qa_manager')
 
-    expect(await screen.findByRole('columnheader', { name: 'Name' })).toBeInTheDocument()
+    expect(await screen.findByText('Line audit')).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: 'Name' })).toBeInTheDocument()
     expect(screen.getByRole('columnheader', { name: 'Status' })).toBeInTheDocument()
     expect(screen.getByRole('columnheader', { name: 'Auditor' })).toBeInTheDocument()
     expect(screen.getByRole('columnheader', { name: 'Date' })).toBeInTheDocument()
     expect(screen.getByRole('columnheader', { name: 'Actions' })).toBeInTheDocument()
-    expect(screen.getByText('Line audit')).toBeInTheDocument()
     expect(screen.getByText('Planned')).toBeInTheDocument()
     expect(screen.getByText('user-1')).toBeInTheDocument()
     expect(screen.getByText('2026-06-01')).toBeInTheDocument()
