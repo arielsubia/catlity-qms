@@ -22,6 +22,18 @@ module "backend" {
   tags                  = local.common_tags
 }
 
+module "frontend" {
+  source = "./modules/frontend"
+
+  project_name        = var.project_name
+  environment         = var.environment
+  domain_name         = var.frontend_domain_name
+  acm_certificate_arn = var.frontend_acm_certificate_arn
+  github_oidc_subject = var.github_oidc_subject
+  deployer_user_name  = var.deployer_user_name
+  tags                = local.common_tags
+}
+
 module "database" {
   source = "./modules/database"
 

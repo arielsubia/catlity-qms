@@ -113,6 +113,34 @@ The first apply only creates the group. The second creates the network and the s
 
 That apply is in place in `us-east-1`. The group came first (3 added). The network, repository, cluster, roles, and service followed (28 added, then the task definition and the service after `ecs:TagResource` was added for task definitions). Nothing was changed or destroyed. VPC `vpc-01e6caa1fbd35a158` has no NAT Gateway. `GET http://54.197.79.88:8000/api/v1/health` returned `"status": "healthy"`. The address changes when the task is replaced. Set `backend_desired_count` to 0 and apply `module.backend.aws_ecs_service.backend` to stop the task and release the public IPv4.
 
+## Frontend deploy
+
+`deploy-frontend.yml` runs only on a push to `main`. It assumes `catlity-qms-dev-github-frontend-deploy` through the GitHub OIDC provider that `module.backend` already created. `module.frontend` reads that provider and does not create a second one. The role trusts only `repo:arielsubia@191406855/catlity-qms@1341227643:ref:refs/heads/main`. The workflow installs the frontend, runs `npm run build`, syncs `frontend/dist` to the private bucket `catlity-qms-dev-frontend`, and invalidates `/*` on the distribution whose origin is that bucket. A pull request does not run this workflow.
+
+The bucket blocks public access and uses SSE-S3. CloudFront reads it with Origin Access Control. The distribution uses price class 100, redirects HTTP to HTTPS, and answers 403 and 404 with `index.html` so a path such as `/audits` still loads the app. This account has no domain, so the viewer certificate is the one CloudFront issues for `*.cloudfront.net`. A hostname can be added later by setting `frontend_domain_name` and `frontend_acm_certificate_arn` (the certificate has to live in `us-east-1`) and applying `module.frontend` again. That updates the same distribution. The bucket, the objects, and the distribution id stay. There is no database migration. The `*.cloudfront.net` hostname keeps working next to the new name.
+
+`devops-ariel` is already at the ten-policy limit, so the S3, CloudFront, and role actions for this apply live on the group `catlity-qms-frontend-deploy`. The GitHub role can list, write, and delete objects in this bucket and can invalidate this distribution. It cannot push an image or update the ECS service. The group does not grant object writes: the first files arrive with the workflow on `main`.
+
+An empty bucket and a distribution with no traffic are **$0/month**. In `us-east-1`, data transfer is about $0.085 per GB and HTTPS requests are about $0.0075 per 10,000. The first 1,000 invalidation paths each month are free, and `/*` is one path. A public ACM certificate is $0 when a domain is added later. On Azure the same shape is a storage account and Front Door. On Google Cloud it is a bucket and Cloud CDN.
+
+`module.frontend` has no dependency on the VPC, RDS, the budget, Cognito, the knowledge bases, the harnesses, or QuickSight. `enable_nat` stays false. A full apply would still create RDS, the budget, and `module.quicksight`, so the commands below use `-target`.
+
+From `infra/`, with `TF_VAR_db_username` and `TF_VAR_db_password` set because those variables have no default:
+
+```bash
+terraform apply -var-file=environments/dev/terraform.tfvars \
+  -target=module.frontend.aws_iam_group.deploy \
+  -target=module.frontend.aws_iam_group_policy.deploy \
+  -target=module.frontend.aws_iam_group_membership.deploy
+
+terraform apply -var-file=environments/dev/terraform.tfvars \
+  -target=module.frontend
+```
+
+The first apply only creates the group. The second creates the bucket, the distribution, and the deploy role. The distribution takes several minutes to reach `Deployed`. Check it with `curl -I https://<distribution-domain>`. Set the repository variables `VITE_COGNITO_USER_POOL_ID`, `VITE_COGNITO_APP_CLIENT_ID`, and `VITE_API_BASE_URL` before the first push to `main` so the bundle points at Cognito and the API. Those values are public in the built JavaScript. The diagram source is `docs/diagrams/frontend-hosting-flow.drawio`.
+
+This apply is not in place yet.
+
 ## Local Development Setup
 
 ### Prerequisites

@@ -242,3 +242,23 @@ output "backend_log_group_name" {
   description = "CloudWatch log group for the backend task"
   value       = module.backend.log_group_name
 }
+
+output "frontend_bucket_name" {
+  description = "Private S3 bucket that stores the frontend build"
+  value       = module.frontend.bucket_name
+}
+
+output "frontend_distribution_id" {
+  description = "CloudFront distribution that serves the frontend"
+  value       = module.frontend.distribution_id
+}
+
+output "frontend_distribution_domain_name" {
+  description = "CloudFront hostname for the frontend"
+  value       = module.frontend.distribution_domain_name
+}
+
+output "frontend_github_deploy_role_arn" {
+  description = "Role assumed by the frontend deploy workflow on main"
+  value       = module.frontend.github_deploy_role_arn
+}
