@@ -1,0 +1,70 @@
+name: Deploy frontend
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: deploy-frontend
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build, sync, and invalidate
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: us-east-1
+      FRONTEND_BUCKET: catlity-qms-dev-frontend
+      VITE_COGNITO_USER_POOL_ID: ${{ vars.VITE_COGNITO_USER_POOL_ID }}
+      VITE_COGNITO_APP_CLIENT_ID: ${{ vars.VITE_COGNITO_APP_CLIENT_ID }}
+      VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Assume the deploy role
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::265751834002:role/catlity-qms-dev-github-frontend-deploy
+          aws-region: us-east-1
+          role-session-name: github-frontend-deploy
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build the frontend
+        working-directory: frontend
+        run: |
+          if [ -z "${VITE_COGNITO_USER_POOL_ID}" ]; then unset VITE_COGNITO_USER_POOL_ID; fi
+          if [ -z "${VITE_COGNITO_APP_CLIENT_ID}" ]; then unset VITE_COGNITO_APP_CLIENT_ID; fi
+          if [ -z "${VITE_API_BASE_URL}" ]; then unset VITE_API_BASE_URL; fi
+          npm run build
+
+      - name: Sync the build to S3
+        run: aws s3 sync frontend/dist "s3://${FRONTEND_BUCKET}" --delete
+
+      - name: Invalidate the CloudFront cache
+        run: |
+          set -euo pipefail
+          ORIGIN="${FRONTEND_BUCKET}.s3.${AWS_REGION}.amazonaws.com"
+          DISTRIBUTION_ID="$(aws cloudfront list-distributions \
+            --query "DistributionList.Items[?Origins.Items[?DomainName=='${ORIGIN}']].Id | [0]" \
+            --output text)"
+          test -n "${DISTRIBUTION_ID}"
+          test "${DISTRIBUTION_ID}" != "None"
+          aws cloudfront create-invalidation \
+            --distribution-id "${DISTRIBUTION_ID}" \
+            --paths "/*"

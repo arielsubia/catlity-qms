@@ -78,3 +78,15 @@ variable "deployer_user_name" {
   type        = string
   default     = "devops-ariel"
 }
+
+variable "frontend_domain_name" {
+  description = "Optional hostname for the frontend distribution. Empty uses the CloudFront default hostname. A later value updates the same distribution and does not replace the bucket."
+  type        = string
+  default     = ""
+}
+
+variable "frontend_acm_certificate_arn" {
+  description = "Optional ACM certificate ARN in us-east-1 for frontend_domain_name. Empty uses the CloudFront default certificate."
+  type        = string
+  default     = ""
+}
