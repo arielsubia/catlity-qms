@@ -6,6 +6,7 @@ from app.models.corrective_action import CorrectiveAction
 from app.models.evidence import Evidence
 from app.models.finding import Finding
 from app.models.finding_evidence import FindingEvidence
+from app.models.quicksight_row_access import QuickSightRowAccess
 from app.models.tenant import Tenant
 from app.models.user import User
 
@@ -21,4 +22,5 @@ __all__ = [
     "FindingEvidence",
     "CorrectiveAction",
     "Evidence",
+    "QuickSightRowAccess",
 ]

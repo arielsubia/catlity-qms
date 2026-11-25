@@ -192,3 +192,23 @@ output "notifications_delivery_function_name" {
   description = "Lambda subscribed to the SES notification topic"
   value       = module.notifications.delivery_function_name
 }
+
+output "quicksight_account_name" {
+  description = "QuickSight account name. The IAM user who applies module.quicksight becomes the admin."
+  value       = module.quicksight.account_name
+}
+
+output "quicksight_data_source_id" {
+  description = "QuickSight data source connected to RDS PostgreSQL"
+  value       = module.quicksight.data_source_id
+}
+
+output "quicksight_compliance_data_set_id" {
+  description = "SPICE dataset of audits and findings, filtered by tenant_id"
+  value       = module.quicksight.compliance_data_set_id
+}
+
+output "quicksight_refresh_schedule_id" {
+  description = "Daily full refresh of the compliance dataset"
+  value       = module.quicksight.refresh_schedule_id
+}

@@ -74,3 +74,20 @@ module "notifications" {
   sender_email = var.ses_sender_email
   tags         = local.common_tags
 }
+
+module "quicksight" {
+  source = "./modules/quicksight"
+
+  project_name          = var.project_name
+  environment           = var.environment
+  notification_email    = var.ses_sender_email
+  vpc_id                = module.networking.vpc_id
+  private_subnet_ids    = module.networking.private_subnet_ids
+  rds_security_group_id = module.networking.rds_security_group_id
+  rds_host              = module.database.rds_endpoint
+  rds_port              = module.database.rds_port
+  rds_database          = module.database.rds_db_name
+  db_username           = var.db_username
+  db_password           = var.db_password
+  tags                  = local.common_tags
+}
