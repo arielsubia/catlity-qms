@@ -17,7 +17,7 @@ module "backend" {
   public_subnet_ids     = module.networking.public_subnet_ids
   ecs_security_group_id = module.networking.ecs_security_group_id
   desired_count         = var.backend_desired_count
-  github_repository     = var.github_repository
+  github_oidc_subject   = var.github_oidc_subject
   deployer_user_name    = var.deployer_user_name
   tags                  = local.common_tags
 }
