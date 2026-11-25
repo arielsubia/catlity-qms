@@ -8,12 +8,16 @@ import { OnboardingPage } from '../pages/onboarding-page'
 import { RegisterPage } from '../pages/register-page'
 import { AiAgentPage } from '../pages/ai-agent-page'
 import { AuditsPage } from '../pages/audits-page'
+import { DashboardPage } from '../pages/dashboard-page'
 import { FindingsPage } from '../pages/findings-page'
 import { NotificationsPage } from '../pages/notifications-page'
 import { SectionPage } from '../pages/section-page'
 import { GuestOnly, RequireAuth, SessionRedirect } from './guards'
 
 const pageFor = (path: string) => {
+  if (path === '/dashboard') {
+    return <DashboardPage />
+  }
   if (path === '/audits') {
     return <AuditsPage />
   }

@@ -5,7 +5,7 @@ import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { listFindings } from '../api/findings-api'
 import { useAuth } from '../auth/use-auth'
 import { OpenFindingsContext } from '../findings/open-findings-context'
-import { NAV_ITEMS } from './nav-items'
+import { visibleNavItems } from './nav-items'
 import { NotificationBell } from './notification-bell'
 import { NotificationInboxContext } from './notification-inbox-context'
 
@@ -64,8 +64,10 @@ export const AppLayout = () => {
     }
   }
 
+  const menuItems = user ? visibleNavItems(user.role) : []
+
   const handleMenuClick = ({ key }: { key: string }) => {
-    const item = NAV_ITEMS.find((entry) => entry.path === key)
+    const item = menuItems.find((entry) => entry.path === key)
     if (!item) {
       return
     }
@@ -129,7 +131,7 @@ export const AppLayout = () => {
                 theme="dark"
                 mode="inline"
                 selectedKeys={[pathname]}
-                items={NAV_ITEMS.map((item) => ({
+                items={menuItems.map((item) => ({
                   key: item.path,
                   label: (
                     <Link to={item.path}>

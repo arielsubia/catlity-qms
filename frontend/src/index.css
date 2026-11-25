@@ -414,3 +414,11 @@ body {
   display: flex;
   justify-content: space-between;
 }
+
+.dashboard-frame {
+  display: block;
+  width: 100%;
+  height: calc(100vh - 240px);
+  min-height: 320px;
+  border: 0;
+}
