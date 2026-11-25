@@ -54,3 +54,27 @@ variable "cognito_logout_urls" {
   type        = list(string)
   default     = ["http://localhost:5173/"]
 }
+
+variable "enable_nat" {
+  description = "Create one NAT Gateway and a private default route. Keep false outside a short tutor demo."
+  type        = bool
+  default     = false
+}
+
+variable "backend_desired_count" {
+  description = "Backend tasks to keep running. Use 0 to stop the Fargate Spot and public IPv4 charges."
+  type        = number
+  default     = 1
+}
+
+variable "github_repository" {
+  description = "GitHub repository allowed to deploy the backend, as owner/name"
+  type        = string
+  default     = "arielsubia/catlity-qms"
+}
+
+variable "deployer_user_name" {
+  description = "IAM user that applies this stack and joins the backend deploy group"
+  type        = string
+  default     = "devops-ariel"
+}

@@ -64,7 +64,7 @@ output "evidence_table_arn" {
 }
 
 output "evidence_backend_task_role_arn" {
-  description = "ARN reserved for the future ECS task role that may access evidence"
+  description = "ARN of the ECS task role created by module.backend"
   value       = module.evidence.backend_task_role_arn
 }
 
@@ -216,4 +216,29 @@ output "quicksight_refresh_schedule_id" {
 output "quicksight_dashboard_id" {
   description = "QuickSight dashboard of compliance KPIs"
   value       = module.quicksight.dashboard_id
+}
+
+output "backend_ecr_repository_url" {
+  description = "URL of the backend ECR repository"
+  value       = module.backend.ecr_repository_url
+}
+
+output "backend_cluster_name" {
+  description = "ECS cluster that runs the backend"
+  value       = module.backend.cluster_name
+}
+
+output "backend_service_name" {
+  description = "ECS service that runs the backend"
+  value       = module.backend.service_name
+}
+
+output "backend_github_deploy_role_arn" {
+  description = "Role assumed by the backend deploy workflow on main"
+  value       = module.backend.github_deploy_role_arn
+}
+
+output "backend_log_group_name" {
+  description = "CloudWatch log group for the backend task"
+  value       = module.backend.log_group_name
 }

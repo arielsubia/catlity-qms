@@ -37,7 +37,7 @@ The platform is composed of:
 | AI Agents | Amazon Bedrock + Knowledge Bases |
 | Dashboard | Amazon QuickSight |
 | IaC | Terraform |
-| CI/CD | GitHub Actions (`ci.yml` on pull requests and on pushes to `main`) |
+| CI/CD | GitHub Actions (`ci.yml` on pull requests and pushes to `main`; `deploy-backend.yml` on pushes to `main`) |
 | Cost Monitoring | AWS Cost Explorer. AWS Budgets is defined and not applied |
 
 ## Repository Structure
@@ -67,7 +67,7 @@ catlity-qms/
 │   ├── common/              # ISO 9001
 │   ├── automotive/          # IATF 16949
 │   └── pharmaceutical/      # GMP
-├── .github/workflows/       # ci.yml: lint, test, and build
+├── .github/workflows/       # ci.yml and deploy-backend.yml
 ├── .gitignore
 └── README.md
 ```
@@ -78,11 +78,40 @@ catlity-qms/
 
 GitHub Actions workflow `ci.yml` runs on every pull request and on every push to `main`, including the merge. A push to a feature branch that already has a pull request runs once, through the pull request event. One job on a GitHub-hosted `ubuntu-latest` runner lints with ruff and eslint, tests with pytest and vitest, and builds the backend Docker image and the Vite bundle. A failure in lint or tests stops the job, so the workflow fails. The image is not pushed to a registry.
 
-Tests that import the AWS SDK receive dummy credentials (`AWS_ACCESS_KEY_ID=testing`, `AWS_SECRET_ACCESS_KEY=testing`, `AWS_DEFAULT_REGION=us-east-1`) and `AWS_EC2_METADATA_DISABLED=true`, so boto3 does not call AWS. The workflow token is limited to `contents: read`. There is no repository secret, no OIDC role, and no call into account `265751834002`.
+Tests that import the AWS SDK receive dummy credentials (`AWS_ACCESS_KEY_ID=testing`, `AWS_SECRET_ACCESS_KEY=testing`, `AWS_DEFAULT_REGION=us-east-1`) and `AWS_EC2_METADATA_DISABLED=true`, so boto3 does not call AWS. The workflow token is limited to `contents: read`. That workflow has no repository secret and no OIDC role, and it does not call account `265751834002`. The backend deploy workflow below is the one that assumes a role in the account.
 
 This adds no AWS resource. Monthly cost on AWS is **$0**. A private repository includes 2,000 GitHub Actions minutes per month on the Free plan, and this job uses a few minutes per push. A public repository does not bill standard runners. On Azure the same check is a pipeline with read access to the repo. On Google Cloud it is Cloud Build with read access to the source. Neither is used here.
 
 The same commands run locally: `ruff check .` and `pytest tests/ -v` from `backend/`, and `npm run lint`, `npm test`, and `npm run build` from `frontend/`. `docker build -t catlity-qms-api:ci .` from `backend/` builds the image and does not push it. After `ci.yml` is on `main`, the badge at the top of this file shows the latest run. The diagram source is `docs/diagrams/ci-pipeline-flow.drawio`.
+
+## Backend deploy
+
+![Backend deploy](docs/diagrams/backend-deploy-flow.png)
+
+`deploy-backend.yml` runs only on a push to `main`. It assumes `catlity-qms-dev-github-backend-deploy` through GitHub's OIDC provider, builds `backend/Dockerfile`, and pushes the image to the ECR repository `catlity-qms-dev-backend` with the commit SHA and with the tag `latest`. It then forces a new deployment of the ECS service `catlity-qms-dev-backend` and calls `GET /api/v1/health` on the task's public IPv4 address. The body has to contain `"status": "healthy"`. A pull request does not run this workflow. `ci.yml` still builds the image and does not push it.
+
+The service keeps one Linux x86 task on the `FARGATE_SPOT` capacity provider: 0.25 vCPU and 512 MB, in the public subnets, with a public IPv4 address. Security group `catlity-qms-dev-ecs-sg` allows TCP 8000. A deployment stops the old task before it starts the new one, so two public addresses are not billed together. The circuit breaker rolls a failed deployment back. Container Insights is off. The execution role `catlity-qms-dev-backend-execution` can pull that repository and write to log group `/ecs/catlity-qms-dev-backend`, retained for 7 days. The task role `catlity-qms-dev-backend-task` is the name the evidence bucket already allows. It has no S3, DynamoDB, SES, or Bedrock permissions. `GET /api/v1/health` does not use PostgreSQL or AWS APIs.
+
+`enable_nat` defaults to false. Applying `module.networking` with the backend creates the VPC, two public subnets, the internet gateway, two private subnets, and the security groups. It does not create the NAT Gateway or its Elastic IP, and the private route table has no route to the internet. RDS, the budget, User Pool `us-east-1_oa6gNvB4B`, `module.knowledge_base`, the existing harnesses, and `module.quicksight` stay out of this apply. `devops-ariel` is already at the ten-policy limit, so the EC2, ECR, ECS, and CloudWatch actions live on the group `catlity-qms-backend-deploy`. That group cannot create a NAT Gateway, allocate an Elastic IP, or call RDS.
+
+While `backend_desired_count` is 1, the estimate in `us-east-1` is about $3.13 per month for this Fargate Spot size, $3.65 per month for the public IPv4, and about $0.40 per month if ECR keeps five images. The cluster, the roles, the OIDC provider, and an idle log group add no standing charge. Setting `backend_desired_count` to 0 stops the task and releases the address. ECR storage remains. On Azure the same shape is Container Registry plus a Container App. On Google Cloud it is Artifact Registry plus Cloud Run.
+
+From `infra/`, with `TF_VAR_db_username` and `TF_VAR_db_password` set because those variables have no default:
+
+```bash
+terraform apply -var-file=environments/dev/terraform.tfvars \
+  -target=module.backend.aws_iam_group.deploy \
+  -target=module.backend.aws_iam_group_policy.deploy \
+  -target=module.backend.aws_iam_group_membership.deploy
+
+terraform apply -var-file=environments/dev/terraform.tfvars \
+  -target=module.networking \
+  -target=module.backend
+```
+
+The first apply only creates the group. The second creates the network and the service. The database module is not a target. Push an image to `catlity-qms-dev-backend:latest` before expecting the task to start, then force a new deployment. Check it with `curl http://<public-ip>:8000/api/v1/health`. The diagram source is `docs/diagrams/backend-deploy-flow.drawio`.
+
+That apply is in place in `us-east-1`. The group came first (3 added). The network, repository, cluster, roles, and service followed (28 added, then the task definition and the service after `ecs:TagResource` was added for task definitions). Nothing was changed or destroyed. VPC `vpc-01e6caa1fbd35a158` has no NAT Gateway. `GET http://54.197.79.88:8000/api/v1/health` returned `"status": "healthy"`. The address changes when the task is replaced. Set `backend_desired_count` to 0 and apply `module.backend.aws_ecs_service.backend` to stop the task and release the public IPv4.
 
 ## Local Development Setup
 
@@ -195,7 +224,7 @@ Corrective actions use the `corrective_actions` table that already points at `fi
 
 Evidence files go straight to the existing bucket `catlity-qms-dev-evidence`. `POST /api/v1/evidence/upload-url` signs the PUT locally for 15 minutes and includes `Content-Type`, `Content-Length`, and `x-amz-storage-class: INTELLIGENT_TIERING`. A pending row is written to the DynamoDB table `catlity-qms-dev-evidence`. `POST /api/v1/evidence/{evidence_id}/confirm` reads the object and sets that row to `uploaded`. The PostgreSQL `evidences` table is not used here. Signing the URL adds no AWS resource. The process credentials need `s3:PutObject` and `s3:GetObject` on the bucket, plus `dynamodb:PutItem`, `GetItem`, and `UpdateItem` on the table. A real PUT and one metadata write stay under $0.01. Tests mock those calls. Check them with `pytest tests/test_evidence.py -v` from `backend/`. That run does not need Docker or `terraform apply`.
 
-Linking an uploaded file writes one row in PostgreSQL `finding_evidences`: `tenant_id`, `finding_id`, `evidence_id`, `linked_by`, and `created_at`. `evidence_id` is the DynamoDB sort key. Migration `005` creates that table and is not applied to Amazon RDS. `POST` and `GET /api/v1/findings/{finding_id}/evidence` call `dynamodb:GetItem` on the existing table `catlity-qms-dev-evidence`. They do not call S3 and add no AWS resource. The task role `catlity-qms-dev-backend-task` still does not exist; local runs use the process credentials. On-demand reads are about $0.25 per million, so a link or a short list stays at **$0/month**. The dev User Pool remains `us-east-1_oa6gNvB4B`. The same file can be linked to several findings. A repeated pair returns 409. A pending row returns 422. Another tenant receives 404. See `docs/diagrams/data-model-erd.png`. Check it with `pytest tests/test_evidence_links.py -v` from `backend/`. That run uses in-memory SQLite and a fake DynamoDB store and does not need Docker or `terraform apply`.
+Linking an uploaded file writes one row in PostgreSQL `finding_evidences`: `tenant_id`, `finding_id`, `evidence_id`, `linked_by`, and `created_at`. `evidence_id` is the DynamoDB sort key. Migration `005` creates that table and is not applied to Amazon RDS. `POST` and `GET /api/v1/findings/{finding_id}/evidence` call `dynamodb:GetItem` on the existing table `catlity-qms-dev-evidence`. They do not call S3 and add no AWS resource. The task role `catlity-qms-dev-backend-task` is defined by `module.backend` and has no S3 or DynamoDB permissions yet; local runs use the process credentials. On-demand reads are about $0.25 per million, so a link or a short list stays at **$0/month**. The dev User Pool remains `us-east-1_oa6gNvB4B`. The same file can be linked to several findings. A repeated pair returns 409. A pending row returns 422. Another tenant receives 404. See `docs/diagrams/data-model-erd.png`. Check it with `pytest tests/test_evidence_links.py -v` from `backend/`. That run uses in-memory SQLite and a fake DynamoDB store and does not need Docker or `terraform apply`.
 
 `GET /api/v1/evidence/{evidence_id}/download-url` signs a 15-minute GET for a row already marked `uploaded`. It uses the same bucket `catlity-qms-dev-evidence` and the same `s3:GetObject` permission the confirm step already needs for `HeadObject`. It adds no AWS resource. Signing stays at **$0/month**. A real GET is about $0.0004 per 1,000 requests. A pending row returns 422. Another tenant receives 404. The browser upload flow is in `docs/diagrams/evidence-upload-flow.png`. Check the route with `pytest tests/test_evidence.py -v` from `backend/`. That run mocks S3 and DynamoDB and does not need Docker or `terraform apply`.
 
@@ -289,7 +318,7 @@ All AWS resources are tagged with `Project: catlity-qms` for filtering in Cost E
 
 The Cognito deploy is estimated at **$0/month** in `us-east-1`. It applies only `module.cognito`. New user pools use the Essentials tier, which includes 10,000 monthly active users at no charge. The Terraform state bucket (`catlity-qms-terraform-state`) is versioned and encrypted with SSE-S3; at a few kilobytes it stays under $0.01/month. State locking uses an S3 lock file (`use_lockfile`) instead of a DynamoDB table.
 
-Evidence storage is `module.evidence`. It was applied with `terraform apply -target=module.evidence`. The dev names are the S3 bucket `catlity-qms-dev-evidence` and the DynamoDB table `catlity-qms-dev-evidence`. The bucket uses SSE-S3, versioning, and a lifecycle rule that moves objects to Intelligent-Tiering on day 0. Noncurrent versions expire after 90 days. Objects under 128 KB stay in the Frequent Access tier and do not pay the monitoring fee. The table is on-demand, with partition key `tenant_id` and sort key `evidence_id`, encrypted with the AWS owned key. Point-in-time recovery is off. Public access is blocked, and the bucket policy denies HTTP plus any principal other than the reserved role `catlity-qms-dev-backend-task`, the principal running Terraform, and the account root. That role is not created yet. An empty bucket and an idle on-demand table are **$0/month**. In `us-east-1`, later usage is about $0.023 per GB-month in the Frequent Access tier, $0.0125 in Infrequent Access, $0.004 in Archive Instant Access, and $0.0025 per 1,000 monitored objects. DynamoDB on-demand is about $1.25 per million writes, $0.25 per million reads, and $0.25 per GB-month. One gigabyte of evidence and a few thousand metadata items stay under $0.10/month, inside the $50 dev budget. The bucket and the table now exist in `us-east-1`. A full `terraform apply` would also create the NAT Gateway and RDS. The identity that runs Terraform needs `s3:CreateBucket`, the evidence bucket `PutBucket*` calls, `dynamodb:CreateTable`, `DescribeTable`, and `TagResource`. The diagram source is `docs/diagrams/evidence-storage-architecture.drawio`.
+Evidence storage is `module.evidence`. It was applied with `terraform apply -target=module.evidence`. The dev names are the S3 bucket `catlity-qms-dev-evidence` and the DynamoDB table `catlity-qms-dev-evidence`. The bucket uses SSE-S3, versioning, and a lifecycle rule that moves objects to Intelligent-Tiering on day 0. Noncurrent versions expire after 90 days. Objects under 128 KB stay in the Frequent Access tier and do not pay the monitoring fee. The table is on-demand, with partition key `tenant_id` and sort key `evidence_id`, encrypted with the AWS owned key. Point-in-time recovery is off. Public access is blocked, and the bucket policy denies HTTP plus any principal other than the reserved role `catlity-qms-dev-backend-task`, the principal running Terraform, and the account root. `module.backend` defines that role and does not grant it S3 actions. An empty bucket and an idle on-demand table are **$0/month**. In `us-east-1`, later usage is about $0.023 per GB-month in the Frequent Access tier, $0.0125 in Infrequent Access, $0.004 in Archive Instant Access, and $0.0025 per 1,000 monitored objects. DynamoDB on-demand is about $1.25 per million writes, $0.25 per million reads, and $0.25 per GB-month. One gigabyte of evidence and a few thousand metadata items stay under $0.10/month, inside the $50 dev budget. The bucket and the table now exist in `us-east-1`. A full `terraform apply` would also create the NAT Gateway and RDS. The identity that runs Terraform needs `s3:CreateBucket`, the evidence bucket `PutBucket*` calls, `dynamodb:CreateTable`, `DescribeTable`, and `TagResource`. The diagram source is `docs/diagrams/evidence-storage-architecture.drawio`.
 
 `module.evidence` also defines CORS on that same bucket so a browser on `http://localhost:5173` can send the presigned PUT. Allowed methods are PUT, GET, and HEAD. Allowed headers are `Content-Type`, `Content-Length`, and `x-amz-storage-class`. CORS has no monthly charge. It is not applied yet. Check it with `terraform plan -target=module.evidence` from `infra/`. Apply that target only when the browser PUT should hit the real bucket. NAT, RDS, the budget, and User Pool `us-east-1_oa6gNvB4B` stay out of that plan. The upload flow is `docs/diagrams/evidence-upload-flow.drawio`.
 

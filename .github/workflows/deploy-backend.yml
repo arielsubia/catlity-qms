@@ -1,0 +1,90 @@
+name: Deploy backend
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: deploy-backend
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build, push, and deploy
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: us-east-1
+      ECR_REPOSITORY: catlity-qms-dev-backend
+      ECS_CLUSTER: catlity-qms-dev
+      ECS_SERVICE: catlity-qms-dev-backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Assume the deploy role
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::265751834002:role/catlity-qms-dev-github-backend-deploy
+          aws-region: us-east-1
+          role-session-name: github-backend-deploy
+
+      - name: Log in to ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push the image
+        working-directory: backend
+        env:
+          IMAGE_URI: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}
+        run: |
+          docker build \
+            --tag "$IMAGE_URI:${{ github.sha }}" \
+            --tag "$IMAGE_URI:latest" \
+            .
+          docker push "$IMAGE_URI:${{ github.sha }}"
+          docker push "$IMAGE_URI:latest"
+
+      - name: Update the ECS service
+        run: |
+          aws ecs update-service \
+            --cluster "$ECS_CLUSTER" \
+            --service "$ECS_SERVICE" \
+            --force-new-deployment \
+            --query 'service.serviceName' \
+            --output text
+          aws ecs wait services-stable \
+            --cluster "$ECS_CLUSTER" \
+            --services "$ECS_SERVICE" \
+            || aws ecs wait services-stable \
+              --cluster "$ECS_CLUSTER" \
+              --services "$ECS_SERVICE"
+
+      - name: Check the health endpoint
+        run: |
+          set -euo pipefail
+          TASK_ARN="$(aws ecs list-tasks \
+            --cluster "$ECS_CLUSTER" \
+            --service-name "$ECS_SERVICE" \
+            --desired-status RUNNING \
+            --query 'taskArns[0]' \
+            --output text)"
+          ENI="$(aws ecs describe-tasks \
+            --cluster "$ECS_CLUSTER" \
+            --tasks "$TASK_ARN" \
+            --query "tasks[0].attachments[0].details[?name=='networkInterfaceId'].value | [0]" \
+            --output text)"
+          PUBLIC_IP="$(aws ec2 describe-network-interfaces \
+            --network-interface-ids "$ENI" \
+            --query 'NetworkInterfaces[0].Association.PublicIp' \
+            --output text)"
+          echo "Health URL http://${PUBLIC_IP}:8000/api/v1/health"
+          curl --fail --silent --show-error \
+            --retry 12 --retry-delay 5 --retry-connrefused \
+            "http://${PUBLIC_IP}:8000/api/v1/health" \
+            --output /tmp/health.json
+          python -c 'import json; body=json.load(open("/tmp/health.json")); assert body["status"]=="healthy", body; print(body)'

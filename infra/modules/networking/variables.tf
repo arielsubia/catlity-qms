@@ -17,3 +17,9 @@ variable "tags" {
   description = "Common tags to apply to all resources"
   type        = map(string)
 }
+
+variable "enable_nat" {
+  description = "Create one NAT Gateway and a private default route. Keep false outside a short tutor demo."
+  type        = bool
+  default     = false
+}

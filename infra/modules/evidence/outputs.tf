@@ -19,7 +19,7 @@ output "table_arn" {
 }
 
 output "backend_task_role_arn" {
-  description = "ARN reserved for the future ECS task role. This module does not create the role."
+  description = "ARN of the ECS task role. module.backend creates the role with this name."
   value       = local.backend_task_role_arn
 }
 
