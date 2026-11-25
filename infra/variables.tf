@@ -67,10 +67,10 @@ variable "backend_desired_count" {
   default     = 1
 }
 
-variable "github_repository" {
-  description = "GitHub repository allowed to deploy the backend, as owner/name"
+variable "github_oidc_subject" {
+  description = "Exact GitHub OIDC sub allowed to deploy the backend. Immutable subjects include the owner id and the repository id."
   type        = string
-  default     = "arielsubia/catlity-qms"
+  default     = "repo:arielsubia@191406855/catlity-qms@1341227643:ref:refs/heads/main"
 }
 
 variable "deployer_user_name" {

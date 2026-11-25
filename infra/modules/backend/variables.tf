@@ -28,8 +28,8 @@ variable "desired_count" {
   type        = number
 }
 
-variable "github_repository" {
-  description = "GitHub repository allowed to deploy, as owner/name"
+variable "github_oidc_subject" {
+  description = "Exact GitHub OIDC sub allowed to assume the deploy role. This repository uses immutable subjects, so the claim includes the owner id and the repository id."
   type        = string
 }
 
