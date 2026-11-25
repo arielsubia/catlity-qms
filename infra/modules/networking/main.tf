@@ -56,8 +56,12 @@ resource "aws_subnet" "private" {
 }
 
 # --- Elastic IP for NAT Gateway ---
+# Count stays at zero unless a short tutor demo turns enable_nat on.
+# An unattached Elastic IP would still be billed, so it is not created either.
 
 resource "aws_eip" "nat" {
+  count = var.enable_nat ? 1 : 0
+
   domain = "vpc"
 
   tags = merge(var.tags, {
@@ -65,10 +69,12 @@ resource "aws_eip" "nat" {
   })
 }
 
-# --- NAT Gateway (single for dev cost savings) ---
+# --- NAT Gateway (single, and only for a short demo) ---
 
 resource "aws_nat_gateway" "main" {
-  allocation_id = aws_eip.nat.id
+  count = var.enable_nat ? 1 : 0
+
+  allocation_id = aws_eip.nat[0].id
   subnet_id     = aws_subnet.public[0].id
 
   tags = merge(var.tags, {
@@ -96,9 +102,15 @@ resource "aws_route_table" "public" {
 resource "aws_route_table" "private" {
   vpc_id = aws_vpc.main.id
 
-  route {
-    cidr_block     = "0.0.0.0/0"
-    nat_gateway_id = aws_nat_gateway.main.id
+  # The local route is implicit. The default route exists only while the NAT
+  # Gateway exists, so a normal apply leaves the private subnets without internet.
+  dynamic "route" {
+    for_each = var.enable_nat ? [1] : []
+
+    content {
+      cidr_block     = "0.0.0.0/0"
+      nat_gateway_id = aws_nat_gateway.main[0].id
+    }
   }
 
   tags = merge(var.tags, {
@@ -168,6 +180,15 @@ resource "aws_security_group" "ecs" {
     to_port         = 8000
     protocol        = "tcp"
     security_groups = [aws_security_group.alb.id]
+  }
+
+  # Dev has no load balancer. The task public IP is how the health check arrives.
+  ingress {
+    description = "API from the internet on the task public IP"
+    from_port   = 8000
+    to_port     = 8000
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   egress {

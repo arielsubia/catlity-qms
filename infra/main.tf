@@ -4,7 +4,22 @@ module "networking" {
   vpc_cidr     = var.vpc_cidr
   project_name = var.project_name
   environment  = var.environment
+  enable_nat   = var.enable_nat
   tags         = local.common_tags
+}
+
+module "backend" {
+  source = "./modules/backend"
+
+  project_name          = var.project_name
+  environment           = var.environment
+  aws_region            = var.aws_region
+  public_subnet_ids     = module.networking.public_subnet_ids
+  ecs_security_group_id = module.networking.ecs_security_group_id
+  desired_count         = var.backend_desired_count
+  github_repository     = var.github_repository
+  deployer_user_name    = var.deployer_user_name
+  tags                  = local.common_tags
 }
 
 module "database" {
